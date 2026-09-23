@@ -3,6 +3,7 @@ export default function App() {
     <div style={{ padding: 24, fontFamily: 'system-ui' }}>
       <h1>AI Assistant</h1>
       <p>A new interaction layer for digital banking</p>
+      <pre>API: {import.meta.env.VITE_API_BASE}</pre>
     </div>
   );
 }
