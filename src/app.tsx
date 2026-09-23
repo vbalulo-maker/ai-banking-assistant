@@ -1,9 +1,29 @@
+import { useState } from 'react';
+import Header from './components/Header';
+import ChatPanel from './components/ChatPanel';
+import OrchestrationPanel from './components/OrchestrationPanel';
+import ScenarioNav, { type ScenarioId } from './components/ScenarioNav';
+
 export default function App() {
+  const [scenario, setScenario] = useState<ScenarioId>('explain');
+
   return (
-    <div style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <h1>AI Assistant</h1>
-      <p>A new interaction layer for digital banking</p>
-      <pre>API: {import.meta.env.VITE_API_BASE}</pre>
+    <div className="app">
+      <Header />
+
+      <div className="app__body">
+        <ChatPanel />
+        <aside className="app__aside">
+          <OrchestrationPanel />
+        </aside>
+      </div>
+
+      <div>
+        <ScenarioNav active={scenario} onChange={setScenario} />
+        <div className="app__footer-note">
+          Synthetic data · Mock banking APIs · Concept only
+        </div>
+      </div>
     </div>
   );
 }
