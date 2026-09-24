@@ -14,7 +14,7 @@ export default function App() {
       <div className="app__body">
         <ChatPanel />
         <aside className="app__aside">
-          <OrchestrationPanel />
+          <OrchestrationPanel scenario={scenario} />
         </aside>
       </div>
 

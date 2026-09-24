@@ -376,3 +376,155 @@ button {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ---------- Orchestration panel ---------- */
+
+.orch-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.orch-panel__switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
+.orch-panel__switch-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.orch-panel__switch-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.orch-panel__switch-btn--active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.orch-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ---------- Orchestration content ---------- */
+
+.orch {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.orch__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.orch__section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+.orch__intent {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.orch__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.orch__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.orch__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.orch__icon--success {
+  color: var(--success);
+}
+
+.orch__icon--warning {
+  color: var(--warning);
+}
+
+.orch__icon--progress {
+  color: var(--text-muted);
+}
+
+.orch__label {
+  flex: 1;
+}
+
+.orch__action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.orch__action--success {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.orch__action--warning {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.orch__action--progress {
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+}
+
+.orch__action-icon {
+  font-size: 14px;
+}
+
+.orch__placeholder {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
