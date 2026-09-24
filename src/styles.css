@@ -528,3 +528,16 @@ button {
   margin: 0;
   line-height: 1.5;
 }
+
+/* ---------- Scenario restart hint ---------- */
+
+.scenario-nav__item--active .scenario-nav__index {
+  opacity: 1;
+}
+
+.scenario-nav__item--active::after {
+  content: '↻';
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.6;
+}

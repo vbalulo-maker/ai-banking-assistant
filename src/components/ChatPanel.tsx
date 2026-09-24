@@ -1,29 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage } from '../services/api';
+import { SCENARIO_PROMPTS } from '../data/scenarios';
+import type { ScenarioId } from './ScenarioNav';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
-const CONVERSATION_KEY = 'ai-banking:conversationId';
-
-function getOrCreateConversationId(): string {
-  const existing = localStorage.getItem(CONVERSATION_KEY);
-  if (existing) return existing;
-  const created = crypto.randomUUID();
-  localStorage.setItem(CONVERSATION_KEY, created);
-  return created;
+interface ChatPanelProps {
+  scenario: ScenarioId;
+  conversationId: string;
 }
 
-export default function ChatPanel() {
-  const [conversationId] = useState<string>(getOrCreateConversationId);
+export default function ChatPanel({ scenario, conversationId }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const previousConversationRef = useRef<string | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -32,19 +29,27 @@ export default function ChatPanel() {
     });
   }, [messages, isSending]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || isSending) return;
+  // Автоматическая отправка стартового запроса при смене сценария
+  useEffect(() => {
+    if (previousConversationRef.current === conversationId) return;
+    previousConversationRef.current = conversationId;
 
+    setMessages([]);
     setError(null);
-    setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: text }]);
+
+    const starterPrompt = SCENARIO_PROMPTS[scenario];
+    void runExchange(starterPrompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  async function runExchange(userText: string) {
+    setError(null);
+    setMessages((prev) => [...prev, { role: 'user', content: userText }]);
     setIsSending(true);
 
     try {
       const res = await sendChatMessage({
-        message: text,
+        message: userText,
         conversationId,
       });
       setMessages((prev) => [
@@ -52,9 +57,8 @@ export default function ChatPanel() {
         { role: 'assistant', content: res.content },
       ]);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Не удалось получить ответ';
-      setError(message);
+      const msg = err instanceof Error ? err.message : 'Не удалось получить ответ';
+      setError(msg);
       setMessages((prev) => [
         ...prev,
         {
@@ -68,6 +72,15 @@ export default function ChatPanel() {
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isSending) return;
+
+    setInput('');
+    await runExchange(text);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -78,11 +91,11 @@ export default function ChatPanel() {
   return (
     <div className="chat">
       <div className="chat__messages" ref={scrollRef}>
-        {messages.length === 0 && (
+        {messages.length === 0 && !isSending && (
           <div className="chat__empty">
             <h2 className="chat__empty-title">What can I help you with?</h2>
             <p className="chat__empty-subtitle">
-              Например: «Переведи Анне 50 000 ₽» или «Почему вчера списали 799 ₽?»
+              Выберите сценарий внизу или напишите свой запрос.
             </p>
           </div>
         )}
