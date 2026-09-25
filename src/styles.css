@@ -541,3 +541,92 @@ button {
   font-size: 11px;
   opacity: 0.6;
 }
+
+/* ---------- Chat loading ---------- */
+
+.chat__history-loading {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px 0;
+  font-style: italic;
+}
+
+/* ---------- Recent conversations ---------- */
+
+.recent {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent__title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+.recent__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.recent__hint--error {
+  color: var(--danger);
+}
+
+.recent__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recent__item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.recent__item:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+.recent__item--active {
+  background: var(--bg-card);
+  border-color: var(--border-strong);
+}
+
+.recent__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.recent__item-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.recent__item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}

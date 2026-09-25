@@ -1,15 +1,24 @@
 import { useState } from 'react';
 import CustomerView from './CustomerView';
 import ProductView from './ProductView';
+import RecentConversations from './RecentConversations';
 import type { ScenarioId } from './ScenarioNav';
 
 type ViewMode = 'customer' | 'product';
 
 interface OrchestrationPanelProps {
   scenario: ScenarioId;
+  activeConversationId: string;
+  onSelectConversation: (scenario: ScenarioId, conversationId: string) => void;
+  refreshKey: number;
 }
 
-export default function OrchestrationPanel({ scenario }: OrchestrationPanelProps) {
+export default function OrchestrationPanel({
+  scenario,
+  activeConversationId,
+  onSelectConversation,
+  refreshKey,
+}: OrchestrationPanelProps) {
   const [view, setView] = useState<ViewMode>('customer');
 
   return (
@@ -39,7 +48,14 @@ export default function OrchestrationPanel({ scenario }: OrchestrationPanelProps
 
       <div className="orch-panel__body">
         {view === 'customer' ? (
-          <CustomerView scenario={scenario} />
+          <>
+            <CustomerView scenario={scenario} />
+            <RecentConversations
+              activeConversationId={activeConversationId}
+              onSelect={onSelectConversation}
+              refreshKey={refreshKey}
+            />
+          </>
         ) : (
           <ProductView />
         )}

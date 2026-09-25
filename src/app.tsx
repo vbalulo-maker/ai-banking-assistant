@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Header from './components/Header';
 import ChatPanel from './components/ChatPanel';
 import OrchestrationPanel from './components/OrchestrationPanel';
 import ScenarioNav, { type ScenarioId } from './components/ScenarioNav';
 
 const CONVERSATION_KEY = 'ai-banking:conversationId';
+
+const ALL_SCENARIOS: ScenarioId[] = [
+  'explain',
+  'understand',
+  'execute',
+  'recommend',
+  'orchestrate',
+];
 
 function readStoredConversationIds(): Partial<Record<ScenarioId, string>> {
   try {
@@ -36,24 +44,22 @@ export default function App() {
     Partial<Record<ScenarioId, string>>
   >(() => {
     const stored = readStoredConversationIds();
-    // Убедимся, что для каждого сценария есть ID
     const initial: Partial<Record<ScenarioId, string>> = { ...stored };
-    (Object.keys({
-      explain: 1,
-      understand: 1,
-      execute: 1,
-      recommend: 1,
-      orchestrate: 1,
-    }) as ScenarioId[]).forEach((s) => {
+    ALL_SCENARIOS.forEach((s) => {
       if (!initial[s]) initial[s] = createConversationId(s);
     });
     writeStoredConversationIds(initial);
     return initial;
   });
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const currentConversationId =
+    conversationIds[scenario] ?? createConversationId(scenario);
+
   function handleScenarioChange(next: ScenarioId) {
     if (next === scenario) {
-      // Тот же сценарий: явно создаём новый диалог
+      // Клик по активному сценарию = новый диалог
       const newId = createConversationId(next);
       const updated = { ...conversationIds, [next]: newId };
       setConversationIds(updated);
@@ -62,8 +68,23 @@ export default function App() {
     setScenario(next);
   }
 
-  const currentConversationId =
-    conversationIds[scenario] ?? createConversationId(scenario);
+  const handleSelectConversation = useCallback(
+    (nextScenario: ScenarioId, conversationId: string) => {
+      const updated = {
+        ...conversationIds,
+        [nextScenario]: conversationId,
+      };
+      setConversationIds(updated);
+      writeStoredConversationIds(updated);
+      setScenario(nextScenario);
+    },
+    [conversationIds]
+  );
+
+  // Триггер обновления списка после отправки сообщения
+  function handleMessageSent() {
+    setRefreshKey((k) => k + 1);
+  }
 
   return (
     <div className="app">
@@ -73,9 +94,15 @@ export default function App() {
         <ChatPanel
           scenario={scenario}
           conversationId={currentConversationId}
+          onMessageSent={handleMessageSent}
         />
         <aside className="app__aside">
-          <OrchestrationPanel scenario={scenario} />
+          <OrchestrationPanel
+            scenario={scenario}
+            activeConversationId={currentConversationId}
+            onSelectConversation={handleSelectConversation}
+            refreshKey={refreshKey}
+          />
         </aside>
       </div>
 

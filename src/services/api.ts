@@ -1,7 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_BASE;
 
 if (!API_BASE) {
-  // Подсказка разработчику: переменная не подхватилась
   console.warn(
     '[api] VITE_API_BASE is not set. Проверь .env / .env.production.'
   );
@@ -20,6 +19,18 @@ export interface ChatResponse {
 export interface ApiError {
   error: string;
   details?: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updated_at: number;
+}
+
+export interface StoredMessage {
+  role: 'user' | 'assistant';
+  message: string;
+  timestamp: number;
 }
 
 export async function sendChatMessage(
@@ -41,26 +52,20 @@ export async function sendChatMessage(
   return data as ChatResponse;
 }
 
-export async function fetchConversations(): Promise<
-  { id: string; title: string; updated_at: number }[]
-> {
+export async function fetchConversations(): Promise<ConversationSummary[]> {
   const res = await fetch(`${API_BASE}/api/conversations`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    conversations: { id: string; title: string; updated_at: number }[];
-  };
+  const data = (await res.json()) as { conversations: ConversationSummary[] };
   return data.conversations;
 }
 
-export async function fetchMessages(conversationId: string): Promise<
-  { role: 'user' | 'assistant'; message: string; timestamp: number }[]
-> {
+export async function fetchMessages(
+  conversationId: string
+): Promise<StoredMessage[]> {
   const res = await fetch(
     `${API_BASE}/api/messages?conversationId=${encodeURIComponent(conversationId)}`
   );
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    messages: { role: 'user' | 'assistant'; message: string; timestamp: number }[];
-  };
+  const data = (await res.json()) as { messages: StoredMessage[] };
   return data.messages;
 }

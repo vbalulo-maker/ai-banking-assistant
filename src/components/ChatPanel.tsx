@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { sendChatMessage } from '../services/api';
+import { sendChatMessage, fetchMessages } from '../services/api';
 import { SCENARIO_PROMPTS } from '../data/scenarios';
 import type { ScenarioId } from './ScenarioNav';
 
@@ -11,34 +11,67 @@ interface Message {
 interface ChatPanelProps {
   scenario: ScenarioId;
   conversationId: string;
+  onMessageSent?: () => void;
 }
 
-export default function ChatPanel({ scenario, conversationId }: ChatPanelProps) {
+export default function ChatPanel({
+  scenario,
+  conversationId,
+  onMessageSent,
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const previousConversationRef = useRef<string | null>(null);
+  const loadedConversationRef = useRef<string | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages, isSending]);
+  }, [messages, isSending, isLoadingHistory]);
 
-  // Автоматическая отправка стартового запроса при смене сценария
+  // Загрузка истории при смене conversationId
   useEffect(() => {
-    if (previousConversationRef.current === conversationId) return;
-    previousConversationRef.current = conversationId;
+    if (loadedConversationRef.current === conversationId) return;
+    loadedConversationRef.current = conversationId;
 
     setMessages([]);
     setError(null);
+    setIsLoadingHistory(true);
 
-    const starterPrompt = SCENARIO_PROMPTS[scenario];
-    void runExchange(starterPrompt);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const history = await fetchMessages(conversationId);
+        if (cancelled) return;
+
+        if (history.length > 0) {
+          setMessages(
+            history.map((m) => ({ role: m.role, content: m.message }))
+          );
+        } else {
+          // Пустая история — отправляем стартовый запрос сценария
+          await runExchange(SCENARIO_PROMPTS[scenario]);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error ? err.message : 'Не удалось загрузить историю';
+        setError(msg);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
@@ -56,8 +89,10 @@ export default function ChatPanel({ scenario, conversationId }: ChatPanelProps) 
         ...prev,
         { role: 'assistant', content: res.content },
       ]);
+      onMessageSent?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Не удалось получить ответ';
+      const msg =
+        err instanceof Error ? err.message : 'Не удалось получить ответ';
       setError(msg);
       setMessages((prev) => [
         ...prev,
@@ -75,7 +110,7 @@ export default function ChatPanel({ scenario, conversationId }: ChatPanelProps) 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isSending) return;
+    if (!text || isSending || isLoadingHistory) return;
 
     setInput('');
     await runExchange(text);
@@ -88,15 +123,24 @@ export default function ChatPanel({ scenario, conversationId }: ChatPanelProps) 
     }
   }
 
+  const isEmpty =
+    messages.length === 0 && !isSending && !isLoadingHistory;
+
   return (
     <div className="chat">
       <div className="chat__messages" ref={scrollRef}>
-        {messages.length === 0 && !isSending && (
+        {isEmpty && (
           <div className="chat__empty">
             <h2 className="chat__empty-title">What can I help you with?</h2>
             <p className="chat__empty-subtitle">
               Выберите сценарий внизу или напишите свой запрос.
             </p>
+          </div>
+        )}
+
+        {isLoadingHistory && (
+          <div className="chat__history-loading">
+            Loading conversation…
           </div>
         )}
 
@@ -139,12 +183,12 @@ export default function ChatPanel({ scenario, conversationId }: ChatPanelProps) 
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
-          disabled={isSending}
+          disabled={isSending || isLoadingHistory}
         />
         <button
           type="submit"
           className="chat__send"
-          disabled={!input.trim() || isSending}
+          disabled={!input.trim() || isSending || isLoadingHistory}
         >
           Send
         </button>
