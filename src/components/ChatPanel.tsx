@@ -213,7 +213,12 @@ export default function ChatPanel({
         )}
 
         {isLoadingHistory && (
-          <div className="chat__history-loading">Loading conversation…</div>
+          <div className="chat__history-loading">
+            <span className="chat__dot" />
+            <span className="chat__dot" />
+            <span className="chat__dot" />
+            <span className="chat__history-label">Loading conversation…</span>
+          </div>
         )}
 
         {messages.map((msg, i) => (
@@ -240,6 +245,9 @@ export default function ChatPanel({
               <span className="chat__dot" />
               <span className="chat__dot" />
               <span className="chat__dot" />
+              <span className="chat__typing-label">
+                Generating response…
+              </span>
             </div>
           </div>
         )}

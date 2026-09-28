@@ -29,6 +29,12 @@ function formatRelativeTime(ts: number): string {
   return `${days} d ago`;
 }
 
+function truncateTitle(title: string, max = 42): string {
+  if (!title) return '(no title)';
+  if (title.length <= max) return title;
+  return title.slice(0, max).trimEnd() + '…';
+}
+
 interface RecentConversationsProps {
   activeConversationId: string;
   onSelect: (scenario: ScenarioId, conversationId: string) => void;
@@ -44,26 +50,24 @@ export default function RecentConversations({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  async function load() {
     setIsLoading(true);
     setError(null);
+    try {
+      const list = await fetchConversations();
+      setItems(list);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Не удалось загрузить историю'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
-    fetchConversations()
-      .then((list) => {
-        if (!cancelled) setItems(list);
-      })
-      .catch((err) => {
-        if (!cancelled)
-          setError(err instanceof Error ? err.message : 'Failed to load');
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
   function handleClick(item: ConversationSummary) {
@@ -74,16 +78,30 @@ export default function RecentConversations({
 
   return (
     <div className="recent">
-      <h3 className="recent__title">Recent conversations</h3>
+      <div className="recent__header">
+        <h3 className="recent__title">Recent conversations</h3>
+        <button
+          type="button"
+          className="recent__refresh"
+          onClick={() => void load()}
+          aria-label="Refresh conversations"
+          title="Refresh"
+        >
+          ↻
+        </button>
+      </div>
 
-      {isLoading && <div className="recent__hint">Loading…</div>}
-      {error && (
+      {isLoading && items.length === 0 && (
+        <div className="recent__hint">Loading…</div>
+      )}
+
+      {error && !isLoading && (
         <div className="recent__hint recent__hint--error">
-          History is unavailable.
+          {error}
           <button
             type="button"
             className="recent__retry"
-            onClick={() => setItems([]) || setError(null) || setRefreshKeyHack()}
+            onClick={() => void load()}
           >
             Try again
           </button>
@@ -94,43 +112,35 @@ export default function RecentConversations({
         <div className="recent__hint">No conversations yet</div>
       )}
 
-      <ul className="recent__list">
-        {items.slice(0, 20).map((item) => {
-          const scenario = detectScenario(item.id);
-          const isActive = item.id === activeConversationId;
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                className={
-                  'recent__item' + (isActive ? ' recent__item--active' : '')
-                }
-                onClick={() => handleClick(item)}
-                disabled={!scenario}
-              >
-                <span className="recent__item-title">
-                  {item.title || '(no title)'}
-                </span>
-                <span className="recent__item-meta">
-                  {scenario ? scenario : 'unknown'} ·{' '}
-                  {formatRelativeTime(item.updated_at)}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {items.length > 0 && (
+        <ul className="recent__list">
+          {items.slice(0, 20).map((item) => {
+            const scenario = detectScenario(item.id);
+            const isActive = item.id === activeConversationId;
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={
+                    'recent__item' + (isActive ? ' recent__item--active' : '')
+                  }
+                  onClick={() => handleClick(item)}
+                  disabled={!scenario}
+                  title={item.title}
+                >
+                  <span className="recent__item-title">
+                    {truncateTitle(item.title)}
+                  </span>
+                  <span className="recent__item-meta">
+                    {scenario ? scenario : 'unknown'} ·{' '}
+                    {formatRelativeTime(item.updated_at)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
-
-  function setRefreshKeyHack() {
-    // триггерим перезагрузку через изменение local state
-    setIsLoading(true);
-    fetchConversations()
-      .then(setItems)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : 'Failed to load')
-      )
-      .finally(() => setIsLoading(false));
-  }
 }
