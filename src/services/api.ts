@@ -1,36 +1,11 @@
+import type { ChatResponse, ChatRequest, ApiError } from '../types/orchestration';
+
 const API_BASE = import.meta.env.VITE_API_BASE;
 
 if (!API_BASE) {
   console.warn(
     '[api] VITE_API_BASE is not set. Проверь .env / .env.production.'
   );
-}
-
-export interface ChatRequest {
-  message: string;
-  conversationId: string;
-}
-
-export interface ChatResponse {
-  content: string;
-  conversationId: string;
-}
-
-export interface ApiError {
-  error: string;
-  details?: string;
-}
-
-export interface ConversationSummary {
-  id: string;
-  title: string;
-  updated_at: number;
-}
-
-export interface StoredMessage {
-  role: 'user' | 'assistant';
-  message: string;
-  timestamp: number;
 }
 
 export async function sendChatMessage(
@@ -50,6 +25,18 @@ export async function sendChatMessage(
   }
 
   return data as ChatResponse;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updated_at: number;
+}
+
+export interface StoredMessage {
+  role: 'user' | 'assistant';
+  message: string;
+  timestamp: number;
 }
 
 export async function fetchConversations(): Promise<ConversationSummary[]> {

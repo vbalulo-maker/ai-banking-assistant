@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import CustomerView from './CustomerView';
 import ProductView from './ProductView';
-import type { ScenarioId } from './ScenarioNav';
+import type { Orchestration } from '../types/orchestration';
 
 type ViewMode = 'customer' | 'product';
 
 interface OrchestrationPanelProps {
-  scenario: ScenarioId;
+  orchestration: Orchestration | null;
 }
 
-export default function OrchestrationPanel({ scenario }: OrchestrationPanelProps) {
+export default function OrchestrationPanel({
+  orchestration,
+}: OrchestrationPanelProps) {
   const [view, setView] = useState<ViewMode>('customer');
 
   return (
@@ -38,7 +40,11 @@ export default function OrchestrationPanel({ scenario }: OrchestrationPanelProps
       </div>
 
       <div className="orch-panel__body">
-        {view === 'customer' ? <CustomerView scenario={scenario} /> : <ProductView />}
+        {view === 'customer' ? (
+          <CustomerView orchestration={orchestration} />
+        ) : (
+          <ProductView />
+        )}
       </div>
     </div>
   );

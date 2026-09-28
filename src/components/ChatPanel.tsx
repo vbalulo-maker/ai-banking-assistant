@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage, fetchMessages } from '../services/api';
 import { SCENARIO_PROMPTS } from '../data/scenarios';
 import type { ScenarioId } from './ScenarioNav';
+import type { Orchestration } from '../types/orchestration';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -12,12 +13,14 @@ interface ChatPanelProps {
   scenario: ScenarioId;
   conversationId: string;
   onMessageSent?: () => void;
+  onOrchestrationChange: (orchestration: Orchestration | null) => void;
 }
 
 export default function ChatPanel({
   scenario,
   conversationId,
   onMessageSent,
+  onOrchestrationChange,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -35,13 +38,13 @@ export default function ChatPanel({
     });
   }, [messages, isSending, isLoadingHistory]);
 
-  // Загрузка истории при смене conversationId
   useEffect(() => {
     if (loadedConversationRef.current === conversationId) return;
     loadedConversationRef.current = conversationId;
 
     setMessages([]);
     setError(null);
+    onOrchestrationChange(null);
     setIsLoadingHistory(true);
 
     let cancelled = false;
@@ -56,7 +59,6 @@ export default function ChatPanel({
             history.map((m) => ({ role: m.role, content: m.message }))
           );
         } else {
-          // Пустая история — отправляем стартовый запрос сценария
           await runExchange(SCENARIO_PROMPTS[scenario]);
         }
       } catch (err) {
@@ -84,11 +86,13 @@ export default function ChatPanel({
       const res = await sendChatMessage({
         message: userText,
         conversationId,
+        scenario,
       });
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: res.content },
+        { role: 'assistant', content: res.message.content },
       ]);
+      onOrchestrationChange(res.orchestration);
       onMessageSent?.();
     } catch (err) {
       const msg =
@@ -102,6 +106,7 @@ export default function ChatPanel({
             'Не удалось получить ответ от ассистента. Попробуйте ещё раз.',
         },
       ]);
+      onOrchestrationChange(null);
     } finally {
       setIsSending(false);
     }
@@ -139,9 +144,7 @@ export default function ChatPanel({
         )}
 
         {isLoadingHistory && (
-          <div className="chat__history-loading">
-            Loading conversation…
-          </div>
+          <div className="chat__history-loading">Loading conversation…</div>
         )}
 
         {messages.map((msg, i) => (

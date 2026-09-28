@@ -954,3 +954,8 @@ button {
 .recent__retry:hover {
   color: var(--accent-hover);
 }
+
+.orch__source {
+  color: var(--text-muted);
+  font-size: 11px;
+}

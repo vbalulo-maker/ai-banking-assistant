@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import OrchestrationPanel from './components/OrchestrationPanel';
 import ScenarioNav, { type ScenarioId } from './components/ScenarioNav';
+import type { Orchestration } from './types/orchestration';
 
 const CONVERSATION_KEY = 'ai-banking:conversationId';
 const SIDEBAR_KEY = 'ai-banking:sidebarOpen';
@@ -25,7 +26,9 @@ function readStoredConversationIds(): Partial<Record<ScenarioId, string>> {
   }
 }
 
-function writeStoredConversationIds(ids: Partial<Record<ScenarioId, string>>) {
+function writeStoredConversationIds(
+  ids: Partial<Record<ScenarioId, string>>
+) {
   try {
     localStorage.setItem(CONVERSATION_KEY, JSON.stringify(ids));
   } catch {
@@ -56,7 +59,12 @@ function createConversationId(scenario: ScenarioId): string {
 
 export default function App() {
   const [scenario, setScenario] = useState<ScenarioId>('explain');
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(readStoredSidebarOpen);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(
+    readStoredSidebarOpen
+  );
+  const [orchestration, setOrchestration] = useState<Orchestration | null>(
+    null
+  );
 
   const [conversationIds, setConversationIds] = useState<
     Partial<Record<ScenarioId, string>>
@@ -107,7 +115,10 @@ export default function App() {
 
   return (
     <div className={`app${sidebarOpen ? ' app--sidebar-open' : ''}`}>
-      <Header sidebarOpen={sidebarOpen} onToggleSidebar={handleToggleSidebar} />
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
+      />
 
       <div className="app__body">
         <Sidebar
@@ -120,9 +131,10 @@ export default function App() {
           scenario={scenario}
           conversationId={currentConversationId}
           onMessageSent={handleMessageSent}
+          onOrchestrationChange={setOrchestration}
         />
         <aside className="app__aside">
-          <OrchestrationPanel scenario={scenario} />
+          <OrchestrationPanel orchestration={orchestration} />
         </aside>
       </div>
 
