@@ -77,14 +77,25 @@ export default function RecentConversations({
       <h3 className="recent__title">Recent conversations</h3>
 
       {isLoading && <div className="recent__hint">Loading…</div>}
-      {error && <div className="recent__hint recent__hint--error">{error}</div>}
+      {error && (
+        <div className="recent__hint recent__hint--error">
+          History is unavailable.
+          <button
+            type="button"
+            className="recent__retry"
+            onClick={() => setItems([]) || setError(null) || setRefreshKeyHack()}
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {!isLoading && !error && items.length === 0 && (
         <div className="recent__hint">No conversations yet</div>
       )}
 
       <ul className="recent__list">
-        {items.slice(0, 8).map((item) => {
+        {items.slice(0, 20).map((item) => {
           const scenario = detectScenario(item.id);
           const isActive = item.id === activeConversationId;
           return (
@@ -111,4 +122,15 @@ export default function RecentConversations({
       </ul>
     </div>
   );
+
+  function setRefreshKeyHack() {
+    // триггерим перезагрузку через изменение local state
+    setIsLoading(true);
+    fetchConversations()
+      .then(setItems)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to load')
+      )
+      .finally(() => setIsLoading(false));
+  }
 }

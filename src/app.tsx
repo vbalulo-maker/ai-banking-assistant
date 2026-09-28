@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
 import Header from './components/Header';
+import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import OrchestrationPanel from './components/OrchestrationPanel';
 import ScenarioNav, { type ScenarioId } from './components/ScenarioNav';
 
 const CONVERSATION_KEY = 'ai-banking:conversationId';
+const SIDEBAR_KEY = 'ai-banking:sidebarOpen';
 
 const ALL_SCENARIOS: ScenarioId[] = [
   'explain',
@@ -23,11 +25,26 @@ function readStoredConversationIds(): Partial<Record<ScenarioId, string>> {
   }
 }
 
-function writeStoredConversationIds(
-  ids: Partial<Record<ScenarioId, string>>
-) {
+function writeStoredConversationIds(ids: Partial<Record<ScenarioId, string>>) {
   try {
     localStorage.setItem(CONVERSATION_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore
+  }
+}
+
+function readStoredSidebarOpen(): boolean {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_KEY);
+    return raw === null ? true : raw === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function writeStoredSidebarOpen(open: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(open));
   } catch {
     // ignore
   }
@@ -39,6 +56,7 @@ function createConversationId(scenario: ScenarioId): string {
 
 export default function App() {
   const [scenario, setScenario] = useState<ScenarioId>('explain');
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(readStoredSidebarOpen);
 
   const [conversationIds, setConversationIds] = useState<
     Partial<Record<ScenarioId, string>>
@@ -59,7 +77,6 @@ export default function App() {
 
   function handleScenarioChange(next: ScenarioId) {
     if (next === scenario) {
-      // Клик по активному сценарию = новый диалог
       const newId = createConversationId(next);
       const updated = { ...conversationIds, [next]: newId };
       setConversationIds(updated);
@@ -70,10 +87,7 @@ export default function App() {
 
   const handleSelectConversation = useCallback(
     (nextScenario: ScenarioId, conversationId: string) => {
-      const updated = {
-        ...conversationIds,
-        [nextScenario]: conversationId,
-      };
+      const updated = { ...conversationIds, [nextScenario]: conversationId };
       setConversationIds(updated);
       writeStoredConversationIds(updated);
       setScenario(nextScenario);
@@ -81,37 +95,43 @@ export default function App() {
     [conversationIds]
   );
 
-  // Триггер обновления списка после отправки сообщения
   function handleMessageSent() {
     setRefreshKey((k) => k + 1);
   }
 
+  function handleToggleSidebar() {
+    const next = !sidebarOpen;
+    setSidebarOpen(next);
+    writeStoredSidebarOpen(next);
+  }
+
   return (
-    <div className="app">
-      <Header />
+    <div className={`app${sidebarOpen ? ' app--sidebar-open' : ''}`}>
+      <Header sidebarOpen={sidebarOpen} onToggleSidebar={handleToggleSidebar} />
 
       <div className="app__body">
+        <Sidebar
+          open={sidebarOpen}
+          activeConversationId={currentConversationId}
+          onSelect={handleSelectConversation}
+          refreshKey={refreshKey}
+        />
         <ChatPanel
           scenario={scenario}
           conversationId={currentConversationId}
           onMessageSent={handleMessageSent}
         />
         <aside className="app__aside">
-          <OrchestrationPanel
-            scenario={scenario}
-            activeConversationId={currentConversationId}
-            onSelectConversation={handleSelectConversation}
-            refreshKey={refreshKey}
-          />
+          <OrchestrationPanel scenario={scenario} />
         </aside>
       </div>
 
-      <div>
+      <footer className="app__footer">
         <ScenarioNav active={scenario} onChange={handleScenarioChange} />
         <div className="app__footer-note">
           Synthetic data · Mock banking APIs · Concept only
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
