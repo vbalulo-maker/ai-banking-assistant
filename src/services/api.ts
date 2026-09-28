@@ -1,4 +1,10 @@
-import type { ChatResponse, ChatRequest, ApiError } from '../types/orchestration';
+import type {
+  ChatResponse,
+  ChatRequest,
+  ApiError,
+  ExecuteRequest,
+  ExecuteResponse,
+} from '../types/orchestration';
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -55,4 +61,23 @@ export async function fetchMessages(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = (await res.json()) as { messages: StoredMessage[] };
   return data.messages;
+}
+
+export async function executeOperation(
+  payload: ExecuteRequest
+): Promise<ExecuteResponse> {
+  const res = await fetch(`${API_BASE}/api/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = (await res.json()) as ExecuteResponse | ApiError;
+
+  if (!res.ok || 'error' in data) {
+    const err = data as ApiError;
+    throw new Error(err.details || err.error || `HTTP ${res.status}`);
+  }
+
+  return data as ExecuteResponse;
 }

@@ -67,3 +67,16 @@ export interface ApiError {
   error: string;
   details?: string;
 }
+
+export interface ExecuteRequest {
+  conversationId: string;
+  actionId: string;
+  parameters: OrchestrationParameter[];
+  action?: string;
+}
+
+export interface ExecuteResponse {
+  status: 'completed' | 'failed';
+  transactionId: string;
+  message: string;
+}

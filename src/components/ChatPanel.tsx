@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage, fetchMessages } from '../services/api';
-import { SCENARIO_PROMPTS } from '../data/scenarios';
+import ConfirmationCard from './ConfirmationCard';
+import DemoMode from './DemoMode';
 import type { ScenarioId } from './ScenarioNav';
 import type { Orchestration } from '../types/orchestration';
 
@@ -14,6 +15,13 @@ interface ChatPanelProps {
   conversationId: string;
   onMessageSent?: () => void;
   onOrchestrationChange: (orchestration: Orchestration | null) => void;
+  onConfirmOperation?: (
+    orchestration: Orchestration
+  ) => Promise<{ transactionId: string } | void>;
+  onEditOperation?: () => void;
+  onDemoScenario?: (scenario: ScenarioId) => void;
+  pendingPrompt?: string | null;
+  onPendingPromptConsumed?: () => void;
 }
 
 export default function ChatPanel({
@@ -21,61 +29,81 @@ export default function ChatPanel({
   conversationId,
   onMessageSent,
   onOrchestrationChange,
+  onConfirmOperation,
+  onEditOperation,
+  onDemoScenario,
+  pendingPrompt,
+  onPendingPromptConsumed,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orchestrationForCard, setOrchestrationForCard] =
+    useState<Orchestration | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const loadedConversationRef = useRef<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages, isSending, isLoadingHistory]);
+  }, [messages, isSending, isLoadingHistory, orchestrationForCard]);
 
+  // Загрузка истории при смене conversationId.
+  // Используем requestId вместо cancelled-флага, чтобы избежать
+  // проблемы с React.StrictMode (двойной вызов useEffect в dev-режиме).
   useEffect(() => {
-    if (loadedConversationRef.current === conversationId) return;
-    loadedConversationRef.current = conversationId;
+    const requestId = ++requestIdRef.current;
 
     setMessages([]);
     setError(null);
+    setOrchestrationForCard(null);
     onOrchestrationChange(null);
     setIsLoadingHistory(true);
-
-    let cancelled = false;
 
     (async () => {
       try {
         const history = await fetchMessages(conversationId);
-        if (cancelled) return;
+        if (requestId !== requestIdRef.current) return;
 
         if (history.length > 0) {
           setMessages(
             history.map((m) => ({ role: m.role, content: m.message }))
           );
-        } else {
-          await runExchange(SCENARIO_PROMPTS[scenario]);
         }
       } catch (err) {
-        if (cancelled) return;
+        if (requestId !== requestIdRef.current) return;
         const msg =
           err instanceof Error ? err.message : 'Не удалось загрузить историю';
         setError(msg);
       } finally {
-        if (!cancelled) setIsLoadingHistory(false);
+        if (requestId === requestIdRef.current) {
+          setIsLoadingHistory(false);
+        }
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+
+  // Отложенный стартовый запрос от родителя (Demo Mode / ScenarioNav).
+  useEffect(() => {
+    if (!pendingPrompt) return;
+    if (isLoadingHistory || isSending) return;
+
+    if (messages.length > 0) {
+      onPendingPromptConsumed?.();
+      return;
+    }
+
+    const text = pendingPrompt;
+    onPendingPromptConsumed?.();
+    void runExchange(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt, isLoadingHistory, isSending, messages.length]);
 
   async function runExchange(userText: string) {
     setError(null);
@@ -92,6 +120,7 @@ export default function ChatPanel({
         ...prev,
         { role: 'assistant', content: res.message.content },
       ]);
+      setOrchestrationForCard(res.orchestration);
       onOrchestrationChange(res.orchestration);
       onMessageSent?.();
     } catch (err) {
@@ -106,6 +135,7 @@ export default function ChatPanel({
             'Не удалось получить ответ от ассистента. Попробуйте ещё раз.',
         },
       ]);
+      setOrchestrationForCard(null);
       onOrchestrationChange(null);
     } finally {
       setIsSending(false);
@@ -128,13 +158,52 @@ export default function ChatPanel({
     }
   }
 
+  async function handleConfirm() {
+    if (!orchestrationForCard || !onConfirmOperation) return;
+    const result = await onConfirmOperation(orchestrationForCard);
+
+    setOrchestrationForCard((prev) =>
+      prev ? { ...prev, state: 'completed' } : prev
+    );
+    onOrchestrationChange(null);
+
+    if (result && 'transactionId' in result) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Операция выполнена. Transaction ID: ${result.transactionId}`,
+        },
+      ]);
+    }
+
+    onMessageSent?.();
+  }
+
+  function handleEdit() {
+    onEditOperation?.();
+    const textarea = document.querySelector<HTMLTextAreaElement>(
+      '.chat__input'
+    );
+    textarea?.focus();
+  }
+
   const isEmpty =
     messages.length === 0 && !isSending && !isLoadingHistory;
+
+  const showConfirmation =
+    orchestrationForCard !== null &&
+    orchestrationForCard.state === 'awaiting_confirmation' &&
+    onConfirmOperation !== undefined;
 
   return (
     <div className="chat">
       <div className="chat__messages" ref={scrollRef}>
-        {isEmpty && (
+        {isEmpty && onDemoScenario && (
+          <DemoMode onSelect={onDemoScenario} />
+        )}
+
+        {isEmpty && !onDemoScenario && (
           <div className="chat__empty">
             <h2 className="chat__empty-title">What can I help you with?</h2>
             <p className="chat__empty-subtitle">
@@ -172,6 +241,17 @@ export default function ChatPanel({
               <span className="chat__dot" />
               <span className="chat__dot" />
             </div>
+          </div>
+        )}
+
+        {showConfirmation && orchestrationForCard && (
+          <div className="chat__confirmation">
+            <ConfirmationCard
+              parameters={orchestrationForCard.parameters}
+              actionLabel={orchestrationForCard.intentLabel}
+              onConfirm={handleConfirm}
+              onEdit={handleEdit}
+            />
           </div>
         )}
 

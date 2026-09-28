@@ -111,9 +111,11 @@ export function calculateTransferFee(amount: number): ToolResult {
 // ---------- Documents (orchestrate) ----------
 
 export function parseDocument(): ToolResult {
+  // accountMasked — счёт списания клиента в банке (совпадает
+  // с accounts[0].masked в customer.json).
   return {
     supplier: 'Example Energy',
-    accountMasked: '••••4832',
+    accountMasked: '••84',
     amount: 7842,
     dueDate: '2026-09-20',
     currency: 'RUB',

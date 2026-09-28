@@ -52,6 +52,13 @@ interface ChatRequestBody {
   scenario: 'explain' | 'understand' | 'execute' | 'recommend' | 'orchestrate';
 }
 
+interface ExecuteRequestBody {
+  conversationId: string;
+  actionId: string;
+  parameters: OrchestrationParameter[];
+  action?: string;
+}
+
 // ---------- Фабрики ----------
 
 function item(
@@ -178,6 +185,11 @@ function buildUnderstand(): BlueprintResult {
 }
 
 function buildExecute(): BlueprintResult {
+  const accountsResult = tools.getAccounts() as {
+    accounts: { masked: string; balance: number }[];
+  };
+  const sourceAccount = accountsResult.accounts[0];
+
   const recipientResult = tools.getRecipient('Anna') as {
     recipient: {
       name: string;
@@ -197,7 +209,9 @@ function buildExecute(): BlueprintResult {
     `Amount: ${formatRub(amount)}`,
     `Fee: ${formatRub(feeResult.fee)}`,
     `Total: ${formatRub(total)}`,
-    `Source account: ••82, sufficient balance`,
+    `Source account: ${sourceAccount.masked}, balance ${formatRub(
+      sourceAccount.balance
+    )}, sufficient funds`,
     `This is a prepared transfer awaiting user confirmation`,
   ];
 
@@ -212,7 +226,7 @@ function buildExecute(): BlueprintResult {
     ],
     context: [
       item('recipient', `Recipient found: ${r.name}`),
-      item('account', 'Account ••82 available'),
+      item('account', `Account ${sourceAccount.masked} available`),
     ],
     knowledge: [],
     tools: [
@@ -237,6 +251,11 @@ function buildExecute(): BlueprintResult {
 }
 
 function buildRecommend(): BlueprintResult {
+  const accountsResult = tools.getAccounts() as {
+    accounts: { balance: number }[];
+  };
+  const availableBalance = accountsResult.accounts[0]?.balance ?? 0;
+
   const productsResult = tools.getProducts() as {
     products: {
       id: string;
@@ -264,7 +283,7 @@ function buildRecommend(): BlueprintResult {
 
   const facts = [
     `Amount: ${formatRub(amount)}, term: ${term} months`,
-    `Available balance: ${formatRub(245300)}`,
+    `Available balance: ${formatRub(availableBalance)}`,
     `Available illustrative products:`,
     ...products.map(
       (p) =>
@@ -282,7 +301,7 @@ function buildRecommend(): BlueprintResult {
       param('amount', 'Amount', formatRub(amount)),
       param('term', 'Term', `${term} months`),
     ],
-    context: [item('balance', 'Available balance')],
+    context: [item('balance', `Available balance: ${formatRub(availableBalance)}`)],
     knowledge: [
       knowledge('product_conditions', 'Product conditions', 'deposits.md'),
     ],
@@ -339,7 +358,12 @@ function buildOrchestrate(): BlueprintResult {
     context: [
       item('doc', 'Document identified'),
       item('supplier', `Supplier: ${supplier.name}`),
-      item('account', `Account ${doc.accountMasked} matched`),
+      item(
+        'account',
+        match.matched
+          ? `Account ${doc.accountMasked} matched`
+          : `Account ${doc.accountMasked} NOT matched`
+      ),
     ],
     knowledge: [],
     tools: [
@@ -380,10 +404,7 @@ function buildOrchestration(
 
 // ---------- System context для LLM ----------
 
-function buildSystemContext(
-  facts: string[],
-  userMessage: string
-): string {
+function buildSystemContext(facts: string[], userMessage: string): string {
   return [
     'Ты — AI-ассистент digital banking.',
     '',
@@ -404,10 +425,7 @@ function buildSystemContext(
 
 // ---------- LLM ----------
 
-async function callDeepSeek(
-  systemContext: string,
-  env: Env
-): Promise<string> {
+async function callDeepSeek(systemContext: string, env: Env): Promise<string> {
   const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -524,6 +542,64 @@ export default {
         return json(
           {
             error: 'internal error',
+            details: err instanceof Error ? err.message : String(err),
+          },
+          origin,
+          500
+        );
+      }
+    }
+
+    if (url.pathname === '/api/execute' && request.method === 'POST') {
+      try {
+        const body = (await request.json()) as ExecuteRequestBody;
+
+        if (!body.conversationId || !body.actionId) {
+          return json(
+            { error: 'conversationId and actionId are required' },
+            origin,
+            400
+          );
+        }
+
+        // Имитация задержки авторизации банком
+        await new Promise((r) => setTimeout(r, 600));
+
+        const transactionId = `AI-${Date.now().toString().slice(-6)}`;
+
+        const summary = (body.parameters || [])
+          .map((p) => `${p.label}: ${p.value}`)
+          .join(', ');
+
+        const confirmationText = `Операция выполнена.\n\n${summary}\n\nTransaction ID: ${transactionId}`;
+
+        // Сохраняем как сообщение ассистента
+        await env.DB.prepare(
+          `INSERT INTO messages (id, conversation_id, user_id, timestamp, role, message)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+          .bind(
+            crypto.randomUUID(),
+            body.conversationId,
+            'demo_user',
+            Date.now(),
+            'assistant',
+            confirmationText
+          )
+          .run();
+
+        return json(
+          {
+            status: 'completed',
+            transactionId,
+            message: confirmationText,
+          },
+          origin
+        );
+      } catch (err) {
+        return json(
+          {
+            error: 'execute failed',
             details: err instanceof Error ? err.message : String(err),
           },
           origin,

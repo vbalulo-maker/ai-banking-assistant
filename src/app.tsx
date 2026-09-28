@@ -4,6 +4,8 @@ import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import OrchestrationPanel from './components/OrchestrationPanel';
 import ScenarioNav, { type ScenarioId } from './components/ScenarioNav';
+import { executeOperation } from './services/api';
+import { SCENARIO_PROMPTS } from './data/scenarios';
 import type { Orchestration } from './types/orchestration';
 
 const CONVERSATION_KEY = 'ai-banking:conversationId';
@@ -65,6 +67,7 @@ export default function App() {
   const [orchestration, setOrchestration] = useState<Orchestration | null>(
     null
   );
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const [conversationIds, setConversationIds] = useState<
     Partial<Record<ScenarioId, string>>
@@ -84,6 +87,7 @@ export default function App() {
     conversationIds[scenario] ?? createConversationId(scenario);
 
   function handleScenarioChange(next: ScenarioId) {
+    // Клик по активному сценарию = новый диалог + перезапуск
     if (next === scenario) {
       const newId = createConversationId(next);
       const updated = { ...conversationIds, [next]: newId };
@@ -91,7 +95,20 @@ export default function App() {
       writeStoredConversationIds(updated);
     }
     setScenario(next);
+    setPendingPrompt(SCENARIO_PROMPTS[next]);
   }
+
+  const handleDemoScenario = useCallback((next: ScenarioId) => {
+    // Всегда создаём свежий диалог для сценария из Demo Mode
+    const newId = createConversationId(next);
+    setConversationIds((prev) => {
+      const updated = { ...prev, [next]: newId };
+      writeStoredConversationIds(updated);
+      return updated;
+    });
+    setScenario(next);
+    setPendingPrompt(SCENARIO_PROMPTS[next]);
+  }, []);
 
   const handleSelectConversation = useCallback(
     (nextScenario: ScenarioId, conversationId: string) => {
@@ -99,6 +116,9 @@ export default function App() {
       setConversationIds(updated);
       writeStoredConversationIds(updated);
       setScenario(nextScenario);
+      // НЕ выставляем pendingPrompt: пользователь вернулся к
+      // старому диалогу, ChatPanel загрузит историю из D1.
+      setPendingPrompt(null);
     },
     [conversationIds]
   );
@@ -111,6 +131,23 @@ export default function App() {
     const next = !sidebarOpen;
     setSidebarOpen(next);
     writeStoredSidebarOpen(next);
+  }
+
+  async function handleConfirmOperation(
+    orch: Orchestration
+  ): Promise<{ transactionId: string } | void> {
+    const result = await executeOperation({
+      conversationId: currentConversationId,
+      actionId: orch.action.id,
+      parameters: orch.parameters,
+      action: orch.action.label,
+    });
+    setRefreshKey((k) => k + 1);
+    return { transactionId: result.transactionId };
+  }
+
+  function handleEditOperation() {
+    // Placeholder: редактирование операции пока не реализовано.
   }
 
   return (
@@ -132,6 +169,11 @@ export default function App() {
           conversationId={currentConversationId}
           onMessageSent={handleMessageSent}
           onOrchestrationChange={setOrchestration}
+          onConfirmOperation={handleConfirmOperation}
+          onEditOperation={handleEditOperation}
+          onDemoScenario={handleDemoScenario}
+          pendingPrompt={pendingPrompt}
+          onPendingPromptConsumed={() => setPendingPrompt(null)}
         />
         <aside className="app__aside">
           <OrchestrationPanel orchestration={orchestration} />
