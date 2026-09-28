@@ -1,0 +1,51 @@
+{
+  "id": "demo_valeriy_test",
+  "name": "Valeriy Test",
+  "accounts": [
+    {
+      "id": "acc_84",
+      "type": "current",
+      "masked": "••84",
+      "balance": 555000,
+      "currency": "RUB"
+    }
+  ],
+  "cards": [
+    {
+      "id": "card_32",
+      "type": "credit",
+      "masked": "••32",
+      "limit": 150000,
+      "outstanding": 87420,
+      "minimumPayment": 4500,
+      "gracePeriodDays": 55,
+      "graceEndsAt": "2026-09-18",
+      "currency": "RUB"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx_799",
+      "date": "2026-09-02",
+      "merchant": "Example Store",
+      "amount": 799,
+      "fee": 0,
+      "currency": "RUB",
+      "category": "subscription"
+    },
+    {
+      "id": "tx_250",
+      "date": "2026-09-05",
+      "merchant": "Coffee Point",
+      "amount": 250,
+      "fee": 0,
+      "currency": "RUB",
+      "category": "food"
+    }
+  ],
+  "deposits": [],
+  "cashback": {
+    "current": 1240,
+    "currency": "RUB"
+  }
+}

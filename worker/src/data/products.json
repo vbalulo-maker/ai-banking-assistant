@@ -1,0 +1,32 @@
+[
+  {
+    "id": "deposit_classic_6m",
+    "name": "Classic deposit",
+    "termMonths": 6,
+    "ratePercent": 12.5,
+    "liquidity": "medium",
+    "withdrawalRestrictions": "Partial withdrawal allowed after 90 days",
+    "minAmount": 50000,
+    "currency": "RUB"
+  },
+  {
+    "id": "deposit_flexible_6m",
+    "name": "Flexible deposit",
+    "termMonths": 6,
+    "ratePercent": 10.0,
+    "liquidity": "high",
+    "withdrawalRestrictions": "Withdrawal any time without losing accrued interest",
+    "minAmount": 10000,
+    "currency": "RUB"
+  },
+  {
+    "id": "deposit_max_6m",
+    "name": "Maximum income deposit",
+    "termMonths": 6,
+    "ratePercent": 13.5,
+    "liquidity": "low",
+    "withdrawalRestrictions": "No withdrawal until maturity",
+    "minAmount": 100000,
+    "currency": "RUB"
+  }
+]
