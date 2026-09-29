@@ -7,10 +7,11 @@ import type {
   Intent,
   IntentParameters,
   IntentDetectionResult,
+  KnowledgeChunkRow,
+  RetrievedChunk,
 } from './types';
 import * as tools from './tools';
 import { KNOWLEDGE_DOCUMENTS, chunkDocument } from './knowledge';
-import type { KnowledgeChunkRow, RetrievedChunk } from './types';
 
 // ---------- Env ----------
 
@@ -208,6 +209,15 @@ async function retrieve(
   return scored.slice(0, topK);
 }
 
+/**
+ * Извлекает короткий заголовок из чанка:
+ * первая строка, начинающаяся с `#` или `## `.
+ */
+function extractHeading(content: string): string {
+  const firstLine = content.split('\n')[0] ?? '';
+  return firstLine.replace(/^#+\s*/, '').trim() || 'Untitled';
+}
+
 // ---------- Intent Detection ----------
 
 const INTENT_SYSTEM_PROMPT = `You are an intent classifier for a digital banking AI assistant.
@@ -315,7 +325,11 @@ interface BlueprintResult {
   systemFacts: string[];
 }
 
-function buildExplain(params: IntentParameters): BlueprintResult {
+async function buildExplain(
+  params: IntentParameters,
+  userMessage: string,
+  env: Env
+): Promise<BlueprintResult> {
   const txs = tools.getTransactions(5) as {
     transactions: {
       merchant: string;
@@ -325,7 +339,6 @@ function buildExplain(params: IntentParameters): BlueprintResult {
     }[];
   };
 
-  // Пытаемся найти транзакцию по сумме из параметров, если LLM её извлекла.
   const requestedAmount =
     typeof params.amount === 'number' ? params.amount : undefined;
   const tx =
@@ -333,11 +346,27 @@ function buildExplain(params: IntentParameters): BlueprintResult {
       ? txs.transactions.find((t) => t.amount === requestedAmount)
       : undefined) ?? txs.transactions[0];
 
-  const facts = [
+  // RAG retrieval
+  const retrieved = await retrieve(userMessage, 3, env);
+
+  const facts: string[] = [
     `Transaction found: ${tx.merchant}, ${formatRub(tx.amount)}, on ${tx.date}`,
     `Fee charged: ${formatRub(tx.fee)}`,
-    `Fee rules: no additional bank fee was charged for this type of transaction`,
+    `Bank rules relevant to this transaction (from knowledge base):`,
+    ...retrieved.map(
+      (chunk) =>
+        `[${chunk.source}] ${chunk.content.replace(/\n+/g, ' ').slice(0, 400)}`
+    ),
   ];
+
+  const knowledgeItems: OrchestrationKnowledge[] = retrieved.map(
+    (chunk, i) =>
+      knowledge(
+        `${chunk.source}-${i}`,
+        extractHeading(chunk.content),
+        chunk.source
+      )
+  );
 
   const orchestration: Orchestration = {
     intent: 'explain_transaction',
@@ -349,10 +378,13 @@ function buildExplain(params: IntentParameters): BlueprintResult {
     context: [
       item('tx', `Transaction found: ${tx.merchant}, ${formatRub(tx.amount)}`),
     ],
-    knowledge: [knowledge('fee_rules', 'Fee rules', 'fees.md')],
+    knowledge:
+      knowledgeItems.length > 0
+        ? knowledgeItems
+        : [knowledge('fee_rules', 'Fee rules', 'fees.md')],
     tools: [
       item('get_transactions', 'get_transactions'),
-      item('get_fee_rules', 'get_fee_rules'),
+      item('retrieve_knowledge', 'retrieve_knowledge'),
     ],
     validation: [],
     action: {
@@ -361,13 +393,16 @@ function buildExplain(params: IntentParameters): BlueprintResult {
       status: 'success',
     },
     state: 'completed',
-    durationMs: 1400,
+    durationMs: 1800,
   };
 
   return { orchestration, systemFacts: facts };
 }
 
-function buildUnderstand(): BlueprintResult {
+async function buildUnderstand(
+  userMessage: string,
+  env: Env
+): Promise<BlueprintResult> {
   const cc = tools.getCreditCardStatus() as {
     masked: string;
     outstanding: number;
@@ -376,13 +411,29 @@ function buildUnderstand(): BlueprintResult {
     gracePeriodDays: number;
   };
 
-  const facts = [
+  // RAG retrieval
+  const retrieved = await retrieve(userMessage, 3, env);
+
+  const facts: string[] = [
     `Credit card ${cc.masked}`,
     `Outstanding balance: ${formatRub(cc.outstanding)}`,
     `Minimum payment: ${formatRub(cc.minimumPayment)}`,
     `Grace period: ${cc.gracePeriodDays} days, ends ${cc.graceEndsAt}`,
-    `To avoid interest, pay the full outstanding amount before grace period ends`,
+    `Bank rules relevant to the customer's question (from knowledge base):`,
+    ...retrieved.map(
+      (chunk) =>
+        `[${chunk.source}] ${chunk.content.replace(/\n+/g, ' ').slice(0, 400)}`
+    ),
   ];
+
+  const knowledgeItems: OrchestrationKnowledge[] = retrieved.map(
+    (chunk, i) =>
+      knowledge(
+        `${chunk.source}-${i}`,
+        extractHeading(chunk.content),
+        chunk.source
+      )
+  );
 
   const orchestration: Orchestration = {
     intent: 'credit_card_status',
@@ -393,10 +444,20 @@ function buildUnderstand(): BlueprintResult {
       item('cc_min', `Minimum payment: ${formatRub(cc.minimumPayment)}`),
       item('cc_grace', `Grace period ends: ${cc.graceEndsAt}`),
     ],
-    knowledge: [
-      knowledge('grace_rules', 'Grace period rules', 'credit_cards.md'),
+    knowledge:
+      knowledgeItems.length > 0
+        ? knowledgeItems
+        : [
+            knowledge(
+              'grace_rules',
+              'Grace period rules',
+              'credit_cards.md'
+            ),
+          ],
+    tools: [
+      item('get_credit_card_status', 'get_credit_card_status'),
+      item('retrieve_knowledge', 'retrieve_knowledge'),
     ],
-    tools: [item('get_credit_card_status', 'get_credit_card_status')],
     validation: [item('deterministic_calc', 'Deterministic calculation')],
     action: {
       id: 'generate_explanation',
@@ -404,7 +465,7 @@ function buildUnderstand(): BlueprintResult {
       status: 'success',
     },
     state: 'completed',
-    durationMs: 1400,
+    durationMs: 1800,
   };
 
   return { orchestration, systemFacts: facts };
@@ -661,15 +722,17 @@ function buildFallback(title: string, message: string): BlueprintResult {
   return { orchestration, systemFacts };
 }
 
-function buildFromIntent(
+async function buildFromIntent(
   intent: Intent,
-  params: IntentParameters
-): BlueprintResult {
+  params: IntentParameters,
+  userMessage: string,
+  env: Env
+): Promise<BlueprintResult> {
   switch (intent) {
     case 'explain_transaction':
-      return buildExplain(params);
+      return buildExplain(params, userMessage, env);
     case 'credit_card_status':
-      return buildUnderstand();
+      return buildUnderstand(userMessage, env);
     case 'transfer':
       return buildExecute(params);
     case 'product_recommendation':
@@ -692,6 +755,8 @@ function buildSystemContext(facts: string[], userMessage: string): string {
     '',
     'Ниже — достоверные факты, собранные оркестратором из банковских систем.',
     'Используй ТОЛЬКО эти значения. Не выдумывай цифры, даты, названия.',
+    'Если в фактах есть правила из базы знаний (строки, начинающиеся с [имя-файла]),',
+    'можешь опираться на них и объяснять клиенту, ссылаясь на правила банка.',
     'Если какого-то значения нет в фактах — не упоминай его вовсе.',
     '',
     'Факты:',
@@ -808,12 +873,13 @@ export default {
         const detected = await detectIntent(message, scenario, env);
 
         // 3. Build orchestration
-        const { orchestration, systemFacts } = buildFromIntent(
+        const { orchestration, systemFacts } = await buildFromIntent(
           detected.intent,
-          detected.parameters
+          detected.parameters,
+          message,
+          env
         );
 
-        // Добавляем confidence в orchestration
         orchestration.confidence = detected.confidence;
 
         // 4. LLM answer
