@@ -2,6 +2,9 @@ name = "ai-banking-api"
 main = "src/index.ts"
 compatibility_date = "2025-07-18"
 
+[ai]
+binding = "AI"
+
 [vars]
 LLM_MODEL = "deepseek-chat"
 

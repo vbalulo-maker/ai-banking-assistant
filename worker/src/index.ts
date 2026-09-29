@@ -9,11 +9,14 @@ import type {
   IntentDetectionResult,
 } from './types';
 import * as tools from './tools';
+import { KNOWLEDGE_DOCUMENTS, chunkDocument } from './knowledge';
+import type { KnowledgeChunkRow, RetrievedChunk } from './types';
 
 // ---------- Env ----------
 
 interface Env {
   DB: D1Database;
+  AI: Ai;
   LLM_API_KEY: string;
   LLM_MODEL: string;
 }
@@ -95,6 +98,114 @@ function knowledge(
 
 function formatRub(value: number): string {
   return value.toLocaleString('ru-RU') + ' ₽';
+}
+
+// ---------- Embeddings ----------
+
+const EMBEDDING_MODEL = '@cf/baai/bge-base-en-v1.5';
+
+async function embed(text: string, env: Env): Promise<number[]> {
+  const result = (await env.AI.run(EMBEDDING_MODEL, {
+    text: [text],
+  })) as { data: number[][] };
+
+  if (!result.data || !result.data[0]) {
+    throw new Error('Embedding returned empty result');
+  }
+
+  return result.data[0];
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+// ---------- Indexing ----------
+
+async function indexKnowledge(env: Env): Promise<{
+  documents: number;
+  chunks: number;
+}> {
+  let totalChunks = 0;
+
+  for (const doc of KNOWLEDGE_DOCUMENTS) {
+    const chunks = chunkDocument(doc);
+
+    for (const chunk of chunks) {
+      const embedding = await embed(chunk.content, env);
+
+      await env.DB.prepare(
+        `INSERT OR REPLACE INTO knowledge_chunks
+         (id, source, chunk_index, content, embedding, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          `${chunk.source}#${chunk.index}`,
+          chunk.source,
+          chunk.index,
+          chunk.content,
+          JSON.stringify(embedding),
+          Date.now()
+        )
+        .run();
+
+      totalChunks++;
+    }
+  }
+
+  return {
+    documents: KNOWLEDGE_DOCUMENTS.length,
+    chunks: totalChunks,
+  };
+}
+
+// ---------- Retrieval ----------
+
+async function retrieve(
+  query: string,
+  topK: number,
+  env: Env
+): Promise<RetrievedChunk[]> {
+  const queryEmbedding = await embed(query, env);
+
+  const { results } = await env.DB.prepare(
+    `SELECT source, content, embedding FROM knowledge_chunks`
+  ).all<KnowledgeChunkRow>();
+
+  if (!results || results.length === 0) {
+    return [];
+  }
+
+  const scored = results.map((row) => {
+    let embedding: number[] = [];
+    try {
+      embedding = JSON.parse(row.embedding) as number[];
+    } catch {
+      embedding = [];
+    }
+    return {
+      source: row.source,
+      content: row.content,
+      score: cosineSimilarity(queryEmbedding, embedding),
+    };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, topK);
 }
 
 // ---------- Intent Detection ----------
@@ -637,6 +748,32 @@ export default {
 
     if (url.pathname === '/api/health' && request.method === 'GET') {
       return json({ status: 'ok' }, origin);
+    }
+
+    if (
+      url.pathname === '/api/admin/index-knowledge' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const result = await indexKnowledge(env);
+        return json(
+          {
+            status: 'ok',
+            documents: result.documents,
+            chunks: result.chunks,
+          },
+          origin
+        );
+      } catch (err) {
+        return json(
+          {
+            error: 'indexing failed',
+            details: err instanceof Error ? err.message : String(err),
+          },
+          origin,
+          500
+        );
+      }
     }
 
     if (url.pathname === '/api/chat' && request.method === 'POST') {

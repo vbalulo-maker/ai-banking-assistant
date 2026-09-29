@@ -112,3 +112,18 @@ export interface ApiError {
   error: string;
   details?: string;
 }
+
+export interface KnowledgeChunkRow {
+  id: string;
+  source: string;
+  chunk_index: number;
+  content: string;
+  embedding: string;
+  created_at: number;
+}
+
+export interface RetrievedChunk {
+  source: string;
+  content: string;
+  score: number;
+}
