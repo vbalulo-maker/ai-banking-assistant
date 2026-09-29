@@ -11,14 +11,26 @@ type CardState =
 
 interface ConfirmationCardProps {
   parameters: OrchestrationParameter[];
-  actionLabel: string;
+  intent: string;
   onConfirm: () => Promise<{ transactionId: string } | void>;
   onEdit: () => void;
 }
 
+const CONFIRM_LABELS: Record<string, string> = {
+  transfer: 'Confirm transfer',
+  pay_utility_bill: 'Confirm payment',
+  product_recommendation: 'Confirm selection',
+  explain_transaction: 'Confirm',
+  credit_card_status: 'Confirm',
+};
+
+function getConfirmLabel(intent: string): string {
+  return CONFIRM_LABELS[intent] ?? 'Confirm';
+}
+
 export default function ConfirmationCard({
   parameters,
-  actionLabel,
+  intent,
   onConfirm,
   onEdit,
 }: ConfirmationCardProps) {
@@ -47,13 +59,31 @@ export default function ConfirmationCard({
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (state !== 'idle') return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void handleConfirm();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onEdit();
+    }
+  }
+
   const isBusy =
     state === 'preparing' || state === 'authorizing' || state === 'executing';
 
   return (
-    <div className="confirm-card">
+    <div
+      className="confirm-card"
+      role="region"
+      aria-label="Operation confirmation"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       <div className="confirm-card__header">
-        <span className="confirm-card__label">{actionLabel}</span>
+        <span className="confirm-card__label">Confirmation</span>
         {state === 'completed' && (
           <span className="confirm-card__badge confirm-card__badge--success">
             Completed
@@ -81,8 +111,9 @@ export default function ConfirmationCard({
             type="button"
             className="confirm-card__btn confirm-card__btn--primary"
             onClick={handleConfirm}
+            autoFocus
           >
-            Confirm {actionLabel.toLowerCase()}
+            {getConfirmLabel(intent)}
           </button>
           <button
             type="button"
@@ -96,9 +127,21 @@ export default function ConfirmationCard({
 
       {isBusy && (
         <div className="confirm-card__progress">
-          <ProgressStep label="Preparing" active={state === 'preparing'} done={stateAfter(state, 'preparing')} />
-          <ProgressStep label="Authorizing" active={state === 'authorizing'} done={stateAfter(state, 'authorizing')} />
-          <ProgressStep label="Executing" active={state === 'executing'} done={stateAfter(state, 'executing')} />
+          <ProgressStep
+            label="Preparing"
+            active={state === 'preparing'}
+            done={stateAfter(state, 'preparing')}
+          />
+          <ProgressStep
+            label="Authorizing"
+            active={state === 'authorizing'}
+            done={stateAfter(state, 'authorizing')}
+          />
+          <ProgressStep
+            label="Executing"
+            active={state === 'executing'}
+            done={stateAfter(state, 'executing')}
+          />
         </div>
       )}
 

@@ -977,6 +977,12 @@ button {
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-md);
+  outline: none;
+  transition: box-shadow 120ms ease;
+}
+
+.confirm-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.08), var(--shadow-md);
 }
 
 .confirm-card__header {
@@ -1290,4 +1296,76 @@ button {
   margin-left: 4px;
   font-style: italic;
   color: var(--text-muted);
+}
+
+/* ---------- ConfirmationCard animations ---------- */
+
+.confirm-card {
+  animation: confirm-card-appear 240ms ease;
+}
+
+@keyframes confirm-card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.confirm-card__btn--primary:focus-visible,
+.confirm-card__btn--ghost:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.confirm-card__progress-step--active .confirm-card__progress-icon {
+  animation: confirm-card-pulse 1s infinite ease-in-out;
+}
+
+@keyframes confirm-card-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ---------- ConfirmationCard animations ---------- */
+
+.confirm-card {
+  animation: confirm-card-appear 240ms ease;
+}
+
+@keyframes confirm-card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.confirm-card__btn--primary:focus-visible,
+.confirm-card__btn--ghost:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.confirm-card__progress-step--active .confirm-card__progress-icon {
+  animation: confirm-card-pulse 1s infinite ease-in-out;
+}
+
+@keyframes confirm-card-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }

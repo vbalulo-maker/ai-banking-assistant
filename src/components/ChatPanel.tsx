@@ -256,7 +256,7 @@ export default function ChatPanel({
           <div className="chat__confirmation">
             <ConfirmationCard
               parameters={orchestrationForCard.parameters}
-              actionLabel={orchestrationForCard.intentLabel}
+              intent={orchestrationForCard.intent}
               onConfirm={handleConfirm}
               onEdit={handleEdit}
             />
