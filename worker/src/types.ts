@@ -23,18 +23,11 @@ export type Intent =
   | 'unknown';
 
 export interface IntentParameters {
-  // transfer
   recipient?: string;
   amount?: number;
-
-  // explain_transaction
   period?: string;
   merchant?: string;
-
-  // product_recommendation
   term?: number;
-
-  // общее
   [key: string]: string | number | undefined;
 }
 
@@ -73,6 +66,30 @@ export interface OrchestrationError {
   message: string;
 }
 
+// ---------- Handoff ----------
+
+export type HandoffReason =
+  | 'intent_unknown'
+  | 'missing_data'
+  | 'out_of_scope'
+  | 'error';
+
+export type HandoffOptionId = 'retry' | 'human' | 'app';
+
+export interface HandoffOption {
+  id: HandoffOptionId;
+  label: string;
+  primary?: boolean;
+}
+
+export interface Handoff {
+  reason: HandoffReason;
+  message: string;
+  options: HandoffOption[];
+}
+
+// ---------- Orchestration ----------
+
 export interface Orchestration {
   intent: string;
   intentLabel: string;
@@ -85,6 +102,7 @@ export interface Orchestration {
   state: OrchestrationState;
   durationMs: number;
   confidence?: number;
+  handoff?: Handoff;
   error?: OrchestrationError;
 }
 
@@ -111,6 +129,19 @@ export interface ChatResponse {
 export interface ApiError {
   error: string;
   details?: string;
+}
+
+export interface ExecuteRequest {
+  conversationId: string;
+  actionId: string;
+  parameters: OrchestrationParameter[];
+  action?: string;
+}
+
+export interface ExecuteResponse {
+  status: 'completed' | 'failed';
+  transactionId: string;
+  message: string;
 }
 
 export interface KnowledgeChunkRow {

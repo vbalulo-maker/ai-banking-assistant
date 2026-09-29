@@ -209,10 +209,6 @@ async function retrieve(
   return scored.slice(0, topK);
 }
 
-/**
- * Извлекает короткий заголовок из чанка:
- * первая строка, начинающаяся с `#` или `## `.
- */
 function extractHeading(content: string): string {
   const firstLine = content.split('\n')[0] ?? '';
   return firstLine.replace(/^#+\s*/, '').trim() || 'Untitled';
@@ -346,7 +342,6 @@ async function buildExplain(
       ? txs.transactions.find((t) => t.amount === requestedAmount)
       : undefined) ?? txs.transactions[0];
 
-  // RAG retrieval
   const retrieved = await retrieve(userMessage, 3, env);
 
   const facts: string[] = [
@@ -411,7 +406,6 @@ async function buildUnderstand(
     gracePeriodDays: number;
   };
 
-  // RAG retrieval
   const retrieved = await retrieve(userMessage, 3, env);
 
   const facts: string[] = [
@@ -491,9 +485,8 @@ function buildExecute(params: IntentParameters): BlueprintResult {
   };
 
   if (!recipientResult.recipient) {
-    return buildFallback(
-      'Recipient not found',
-      `Я не нашёл получателя «${recipientQuery}» в ваших контактах. Уточните имя или номер телефона.`
+    return buildMissingDataFallback(
+      `получатель «${recipientQuery}» не найден в ваших контактах`
     );
   }
   const r = recipientResult.recipient;
@@ -694,33 +687,122 @@ function buildOrchestrate(): BlueprintResult {
   return { orchestration, systemFacts: facts };
 }
 
-function buildFallback(title: string, message: string): BlueprintResult {
+// ---------- Handoff fallbacks ----------
+
+function buildIntentUnknownFallback(): BlueprintResult {
   const orchestration: Orchestration = {
     intent: 'unknown',
-    intentLabel: title,
+    intentLabel: 'Request not recognized',
     parameters: [],
     context: [],
     knowledge: [],
     tools: [],
     validation: [],
     action: {
-      id: 'fallback',
-      label: 'Request not recognized',
+      id: 'handoff',
+      label: 'Offer human specialist',
       status: 'warning',
     },
     state: 'fallback',
     durationMs: 800,
-    error: { code: 'INTENT_UNKNOWN', message },
+    handoff: {
+      reason: 'intent_unknown',
+      message:
+        'Я не до конца понял ваш вопрос. Могу помочь с переводом, объяснением операций, вопросами по кредитке, подбором вклада и оплатой счетов.',
+      options: [
+        { id: 'retry', label: 'Попробовать ещё раз', primary: false },
+        { id: 'human', label: 'Позвать специалиста', primary: true },
+      ],
+    },
   };
 
   const systemFacts = [
-    `The assistant could not determine the intent of the user's request.`,
-    `Reason: ${message}`,
-    `Instruction: politely explain what you can help with and suggest supported scenarios.`,
+    `The assistant could not determine the user's intent.`,
+    `Politely acknowledge this. Mention what the assistant CAN help with (a few examples, not the full list).`,
+    `Do NOT use the phrase "обратитесь в поддержку" or "свяжитесь с поддержкой".`,
+    `Mention that a human specialist can be connected with one tap.`,
+    `Tone: warm, brief, respectful. Address the customer as «вы».`,
   ];
 
   return { orchestration, systemFacts };
 }
+
+function buildMissingDataFallback(reason: string): BlueprintResult {
+  const orchestration: Orchestration = {
+    intent: 'unknown',
+    intentLabel: 'Missing data',
+    parameters: [],
+    context: [],
+    knowledge: [],
+    tools: [],
+    validation: [],
+    action: {
+      id: 'handoff',
+      label: 'Offer human specialist',
+      status: 'warning',
+    },
+    state: 'fallback',
+    durationMs: 800,
+    handoff: {
+      reason: 'missing_data',
+      message: `Хочу помочь, но у меня не хватает данных: ${reason}. Передам специалисту — он проверит детали и решит вопрос.`,
+      options: [
+        { id: 'human', label: 'Позвать специалиста', primary: true },
+        { id: 'retry', label: 'Попробовать снова', primary: false },
+      ],
+    },
+  };
+
+  const systemFacts = [
+    `The assistant could not complete the request because of missing data: ${reason}.`,
+    `Briefly empathize with the customer.`,
+    `Explain that a human specialist will pick up the case and usually resolves it within a few minutes.`,
+    `Be warm, brief, respectful. Do NOT use the phrase "обратитесь в поддержку".`,
+    `Address the customer as «вы».`,
+  ];
+
+  return { orchestration, systemFacts };
+}
+
+function buildOutOfScopeFallback(request: string): BlueprintResult {
+  const orchestration: Orchestration = {
+    intent: 'unknown',
+    intentLabel: 'Out of scope',
+    parameters: [],
+    context: [],
+    knowledge: [],
+    tools: [],
+    validation: [],
+    action: {
+      id: 'handoff',
+      label: 'Offer human specialist',
+      status: 'warning',
+    },
+    state: 'fallback',
+    durationMs: 800,
+    handoff: {
+      reason: 'out_of_scope',
+      message:
+        'Я пока не могу сделать это сам. Это лучше решить со специалистом — он подключится к диалогу прямо сейчас. Или покажу, как это сделать в приложении.',
+      options: [
+        { id: 'human', label: 'Позвать специалиста', primary: true },
+        { id: 'app', label: 'Показать в приложении', primary: false },
+      ],
+    },
+  };
+
+  const systemFacts = [
+    `The user's request is out of scope for the assistant: "${request}".`,
+    `Do not pretend you can fulfill it.`,
+    `Offer two warm options: connect a human specialist, or show how to do it in the app.`,
+    `Be concise and empathetic. Do NOT use the phrase "обратитесь в поддержку".`,
+    `Address the customer as «вы».`,
+  ];
+
+  return { orchestration, systemFacts };
+}
+
+// ---------- Intent router ----------
 
 async function buildFromIntent(
   intent: Intent,
@@ -740,10 +822,7 @@ async function buildFromIntent(
     case 'pay_utility_bill':
       return buildOrchestrate();
     case 'unknown':
-      return buildFallback(
-        'Request not recognized',
-        'Я не уверен, что вы имеете в виду. Уточните, пожалуйста.'
-      );
+      return buildIntentUnknownFallback();
   }
 }
 
@@ -758,6 +837,11 @@ function buildSystemContext(facts: string[], userMessage: string): string {
     'Если в фактах есть правила из базы знаний (строки, начинающиеся с [имя-файла]),',
     'можешь опираться на них и объяснять клиенту, ссылаясь на правила банка.',
     'Если какого-то значения нет в фактах — не упоминай его вовсе.',
+    '',
+    'Тон: тёплый, уважительный, без канцелярита.',
+    'НИКОГДА не пиши фразы вида «обратитесь в поддержку», «свяжитесь с поддержкой»,',
+    '«позвоните по номеру». Если нужен человек — используй формулировку',
+    '«я могу подключить специалиста».',
     '',
     'Факты:',
     ...facts.map((f) => `• ${f}`),
@@ -854,7 +938,6 @@ export default {
           );
         }
 
-        // 1. Save user message
         await env.DB.prepare(
           `INSERT INTO messages (id, conversation_id, user_id, timestamp, role, message)
            VALUES (?, ?, ?, ?, ?, ?)`
@@ -869,10 +952,8 @@ export default {
           )
           .run();
 
-        // 2. Detect intent
         const detected = await detectIntent(message, scenario, env);
 
-        // 3. Build orchestration
         const { orchestration, systemFacts } = await buildFromIntent(
           detected.intent,
           detected.parameters,
@@ -882,11 +963,9 @@ export default {
 
         orchestration.confidence = detected.confidence;
 
-        // 4. LLM answer
         const systemContext = buildSystemContext(systemFacts, message);
         const answerText = await callDeepSeek(systemContext, env);
 
-        // 5. Save assistant message
         await env.DB.prepare(
           `INSERT INTO messages (id, conversation_id, user_id, timestamp, role, message)
            VALUES (?, ?, ?, ?, ?, ?)`
@@ -901,7 +980,6 @@ export default {
           )
           .run();
 
-        // 6. Upsert conversation
         await env.DB.prepare(
           `INSERT INTO conversations (id, user_id, title, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?)
