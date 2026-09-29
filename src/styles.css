@@ -67,6 +67,14 @@ button {
   transition: grid-template-columns 200ms ease;
 }
 
+.app__aside {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .app--sidebar-open .app__body {
   grid-template-columns: 280px 1fr 420px;
 }
