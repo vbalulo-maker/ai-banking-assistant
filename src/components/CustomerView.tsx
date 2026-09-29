@@ -25,15 +25,22 @@ export default function CustomerView({ orchestration }: CustomerViewProps) {
     );
   }
 
+  // key на корневом div заставляет React пересоздать дерево
+  // при смене оркестрации — это триггерит CSS-анимацию появления.
+  const animationKey = `${orchestration.intent}-${orchestration.durationMs}`;
+
   return (
-    <div className="orch">
-      <section className="orch__section">
+    <div className="orch" key={animationKey}>
+      <section className="orch__section" style={{ animationDelay: '0ms' }}>
         <h3 className="orch__section-title">Intent</h3>
         <div className="orch__intent">{orchestration.intentLabel}</div>
       </section>
 
       {orchestration.parameters.length > 0 && (
-        <section className="orch__section">
+        <section
+          className="orch__section"
+          style={{ animationDelay: '60ms' }}
+        >
           <h3 className="orch__section-title">Parameters</h3>
           <ul className="orch__list">
             {orchestration.parameters.map((p) => (
@@ -48,7 +55,10 @@ export default function CustomerView({ orchestration }: CustomerViewProps) {
       )}
 
       {orchestration.context.length > 0 && (
-        <section className="orch__section">
+        <section
+          className="orch__section"
+          style={{ animationDelay: '120ms' }}
+        >
           <h3 className="orch__section-title">Customer context</h3>
           <ul className="orch__list">
             {orchestration.context.map((item) => (
@@ -67,7 +77,10 @@ export default function CustomerView({ orchestration }: CustomerViewProps) {
       )}
 
       {orchestration.knowledge.length > 0 && (
-        <section className="orch__section">
+        <section
+          className="orch__section"
+          style={{ animationDelay: '180ms' }}
+        >
           <h3 className="orch__section-title">Knowledge</h3>
           <ul className="orch__list">
             {orchestration.knowledge.map((item) => (
@@ -89,7 +102,10 @@ export default function CustomerView({ orchestration }: CustomerViewProps) {
       )}
 
       {orchestration.tools.length > 0 && (
-        <section className="orch__section">
+        <section
+          className="orch__section"
+          style={{ animationDelay: '240ms' }}
+        >
           <h3 className="orch__section-title">Tools</h3>
           <ul className="orch__list">
             {orchestration.tools.map((item) => (
@@ -108,7 +124,10 @@ export default function CustomerView({ orchestration }: CustomerViewProps) {
       )}
 
       {orchestration.validation.length > 0 && (
-        <section className="orch__section">
+        <section
+          className="orch__section"
+          style={{ animationDelay: '300ms' }}
+        >
           <h3 className="orch__section-title">Validation</h3>
           <ul className="orch__list">
             {orchestration.validation.map((item) => (
@@ -126,9 +145,14 @@ export default function CustomerView({ orchestration }: CustomerViewProps) {
         </section>
       )}
 
-      <section className="orch__section">
+      <section
+        className="orch__section"
+        style={{ animationDelay: '360ms' }}
+      >
         <h3 className="orch__section-title">Action</h3>
-        <div className={`orch__action orch__action--${orchestration.action.status}`}>
+        <div
+          className={`orch__action orch__action--${orchestration.action.status}`}
+        >
           <span className="orch__action-icon">
             {STATUS_ICON[orchestration.action.status]}
           </span>

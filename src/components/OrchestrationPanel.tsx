@@ -40,11 +40,13 @@ export default function OrchestrationPanel({
       </div>
 
       <div className="orch-panel__body">
-        {view === 'customer' ? (
-          <CustomerView orchestration={orchestration} />
-        ) : (
-          <ProductView />
-        )}
+        <div className="orch-panel__view" key={view}>
+          {view === 'customer' ? (
+            <CustomerView orchestration={orchestration} />
+          ) : (
+            <ProductView />
+          )}
+        </div>
       </div>
     </div>
   );

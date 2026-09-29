@@ -431,6 +431,14 @@ button {
   overflow-y: auto;
   padding-right: 4px;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.orch-panel__view {
+  flex: 1;
+  min-height: 0;
+  animation: orch-panel-fade 200ms ease;
 }
 
 /* ---------- Orchestration content ---------- */
@@ -477,28 +485,6 @@ button {
   gap: 8px;
   font-size: 13px;
   color: var(--text-secondary);
-}
-
-.orch__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.orch__icon--success {
-  color: var(--success);
-}
-
-.orch__icon--warning {
-  color: var(--warning);
-}
-
-.orch__icon--progress {
-  color: var(--text-muted);
 }
 
 .orch__label {
@@ -1367,5 +1353,113 @@ button {
   }
   50% {
     opacity: 0.4;
+  }
+}
+
+/* ---------- Orchestration animations ---------- */
+
+.orch__section {
+  animation: orch-section-appear 320ms ease both;
+}
+
+@keyframes orch-section-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.orch-panel__view {
+  animation: orch-panel-fade 200ms ease;
+}
+
+@keyframes orch-panel-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- Status icons polish ---------- */
+
+.orch__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+
+.orch__icon--success {
+  color: var(--success);
+  background: #ecfdf5;
+}
+
+.orch__icon--warning {
+  color: var(--warning);
+  background: #fffbeb;
+}
+
+.orch__icon--progress {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  animation: orch-icon-pulse 1.4s infinite ease-in-out;
+}
+
+.orch__icon--error {
+  color: var(--danger);
+  background: #fef2f2;
+}
+
+.orch__icon--skipped {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+@keyframes orch-icon-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ---------- Action block polish ---------- */
+
+.orch__action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 120ms ease;
+}
+
+.orch__action-icon {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orch__section,
+  .orch-panel__view,
+  .confirm-card,
+  .orch__icon--progress,
+  .confirm-card__progress-step--active .confirm-card__progress-icon {
+    animation: none !important;
   }
 }
