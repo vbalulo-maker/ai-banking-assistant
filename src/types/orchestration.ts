@@ -45,13 +45,24 @@ export interface Orchestration {
   action: OrchestrationAction;
   state: OrchestrationState;
   durationMs: number;
+  confidence?: number;
   error?: OrchestrationError;
 }
 
 export interface ChatRequest {
   message: string;
   conversationId: string;
-  scenario: 'explain' | 'understand' | 'execute' | 'recommend' | 'orchestrate';
+  /**
+   * Optional hint for intent detection. When present, the Worker passes
+   * it to the LLM as a weak prior. When absent, the LLM determines the
+   * intent from the message alone.
+   */
+  scenario?:
+    | 'explain'
+    | 'understand'
+    | 'execute'
+    | 'recommend'
+    | 'orchestrate';
 }
 
 export interface ChatResponse {

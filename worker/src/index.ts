@@ -4,6 +4,9 @@ import type {
   OrchestrationKnowledge,
   OrchestrationParameter,
   StatusKind,
+  Intent,
+  IntentParameters,
+  IntentDetectionResult,
 } from './types';
 import * as tools from './tools';
 
@@ -44,12 +47,17 @@ function json(data: unknown, origin: string | null, status = 200): Response {
   });
 }
 
-// ---------- Types ----------
+// ---------- Types (запросы) ----------
 
 interface ChatRequestBody {
   message: string;
   conversationId: string;
-  scenario: 'explain' | 'understand' | 'execute' | 'recommend' | 'orchestrate';
+  scenario?:
+    | 'explain'
+    | 'understand'
+    | 'execute'
+    | 'recommend'
+    | 'orchestrate';
 }
 
 interface ExecuteRequestBody {
@@ -89,6 +97,106 @@ function formatRub(value: number): string {
   return value.toLocaleString('ru-RU') + ' ₽';
 }
 
+// ---------- Intent Detection ----------
+
+const INTENT_SYSTEM_PROMPT = `You are an intent classifier for a digital banking AI assistant.
+
+Classify the user's message into EXACTLY ONE of these intents:
+
+1. explain_transaction — user asks why a transaction happened, what a charge was for.
+2. credit_card_status — user asks about credit card balance, minimum payment, or grace period.
+3. transfer — user asks to send money to someone.
+4. product_recommendation — user asks where to place funds, which deposit or product to choose.
+5. pay_utility_bill — user asks to pay a utility bill, check a bill, or pay a received invoice.
+6. unknown — none of the above, or not enough information to decide.
+
+Extract parameters where applicable:
+- transfer: recipient (string), amount (number, in RUB)
+- explain_transaction: period (string, e.g. "last 7 days"), amount (number), merchant (string)
+- product_recommendation: amount (number), term (number, months)
+
+Return STRICTLY valid JSON in this format:
+{
+  "intent": "<one of the six>",
+  "parameters": { ... },
+  "confidence": <number 0..1>,
+  "reasoning": "<short>"
+}
+
+Do not add any text outside JSON. Do not wrap in code fences.`;
+
+async function detectIntent(
+  message: string,
+  hint: string | undefined,
+  env: Env
+): Promise<IntentDetectionResult> {
+  const hintLine = hint
+    ? `\n\nHint from UI (may be wrong, use it only as a weak prior): ${hint}`
+    : '';
+
+  try {
+    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.LLM_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: env.LLM_MODEL || 'deepseek-chat',
+        messages: [
+          { role: 'system', content: INTENT_SYSTEM_PROMPT },
+          { role: 'user', content: message + hintLine },
+        ],
+        temperature: 0.0,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('intent detection failed:', res.status, errText);
+      return fallbackIntent();
+    }
+
+    const data = (await res.json()) as {
+      choices: { message: { content: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content ?? '{}';
+
+    const parsed = JSON.parse(content) as Partial<IntentDetectionResult>;
+
+    const intent = (parsed.intent as Intent) ?? 'unknown';
+    const validIntents: Intent[] = [
+      'explain_transaction',
+      'credit_card_status',
+      'transfer',
+      'product_recommendation',
+      'pay_utility_bill',
+      'unknown',
+    ];
+
+    return {
+      intent: validIntents.includes(intent) ? intent : 'unknown',
+      parameters: parsed.parameters ?? {},
+      confidence:
+        typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+      reasoning: parsed.reasoning ?? '',
+    };
+  } catch (err) {
+    console.error('intent detection error:', err);
+    return fallbackIntent();
+  }
+}
+
+function fallbackIntent(): IntentDetectionResult {
+  return {
+    intent: 'unknown',
+    parameters: {},
+    confidence: 0,
+    reasoning: 'Intent detection failed',
+  };
+}
+
 // ---------- Scenario builders ----------
 
 interface BlueprintResult {
@@ -96,7 +204,7 @@ interface BlueprintResult {
   systemFacts: string[];
 }
 
-function buildExplain(): BlueprintResult {
+function buildExplain(params: IntentParameters): BlueprintResult {
   const txs = tools.getTransactions(5) as {
     transactions: {
       merchant: string;
@@ -105,7 +213,14 @@ function buildExplain(): BlueprintResult {
       fee: number;
     }[];
   };
-  const tx = txs.transactions[0];
+
+  // Пытаемся найти транзакцию по сумме из параметров, если LLM её извлекла.
+  const requestedAmount =
+    typeof params.amount === 'number' ? params.amount : undefined;
+  const tx =
+    (requestedAmount !== undefined
+      ? txs.transactions.find((t) => t.amount === requestedAmount)
+      : undefined) ?? txs.transactions[0];
 
   const facts = [
     `Transaction found: ${tx.merchant}, ${formatRub(tx.amount)}, on ${tx.date}`,
@@ -117,7 +232,7 @@ function buildExplain(): BlueprintResult {
     intent: 'explain_transaction',
     intentLabel: 'Explain transaction',
     parameters: [
-      param('period', 'Period', 'last 7 days'),
+      param('period', 'Period', params.period ?? 'last 7 days'),
       param('amount', 'Amount', formatRub(tx.amount)),
     ],
     context: [
@@ -184,23 +299,38 @@ function buildUnderstand(): BlueprintResult {
   return { orchestration, systemFacts: facts };
 }
 
-function buildExecute(): BlueprintResult {
+function buildExecute(params: IntentParameters): BlueprintResult {
   const accountsResult = tools.getAccounts() as {
     accounts: { masked: string; balance: number }[];
   };
   const sourceAccount = accountsResult.accounts[0];
 
-  const recipientResult = tools.getRecipient('Anna') as {
-    recipient: {
+  const recipientQuery =
+    typeof params.recipient === 'string' ? params.recipient : 'Anna';
+
+  const recipientResult = tools.getRecipient(recipientQuery) as {
+    recipient?: {
       name: string;
       bank: string;
       accountMasked: string;
       verified: boolean;
     };
+    error?: string;
   };
+
+  if (!recipientResult.recipient) {
+    return buildFallback(
+      'Recipient not found',
+      `Я не нашёл получателя «${recipientQuery}» в ваших контактах. Уточните имя или номер телефона.`
+    );
+  }
   const r = recipientResult.recipient;
 
-  const amount = 50000;
+  const amount =
+    typeof params.amount === 'number' && params.amount > 0
+      ? params.amount
+      : 50000;
+
   const feeResult = tools.calculateTransferFee(amount) as { fee: number };
   const total = amount + feeResult.fee;
 
@@ -250,7 +380,7 @@ function buildExecute(): BlueprintResult {
   return { orchestration, systemFacts: facts };
 }
 
-function buildRecommend(): BlueprintResult {
+function buildRecommend(params: IntentParameters): BlueprintResult {
   const accountsResult = tools.getAccounts() as {
     accounts: { balance: number }[];
   };
@@ -267,8 +397,13 @@ function buildRecommend(): BlueprintResult {
     }[];
   };
 
-  const amount = 300000;
-  const term = 6;
+  const amount =
+    typeof params.amount === 'number' && params.amount > 0
+      ? params.amount
+      : 300000;
+
+  const term =
+    typeof params.term === 'number' && params.term > 0 ? params.term : 6;
 
   const products = productsResult.products
     .filter((p) => p.termMonths === term)
@@ -301,7 +436,9 @@ function buildRecommend(): BlueprintResult {
       param('amount', 'Amount', formatRub(amount)),
       param('term', 'Term', `${term} months`),
     ],
-    context: [item('balance', `Available balance: ${formatRub(availableBalance)}`)],
+    context: [
+      item('balance', `Available balance: ${formatRub(availableBalance)}`),
+    ],
     knowledge: [
       knowledge('product_conditions', 'Product conditions', 'deposits.md'),
     ],
@@ -385,20 +522,54 @@ function buildOrchestrate(): BlueprintResult {
   return { orchestration, systemFacts: facts };
 }
 
-function buildOrchestration(
-  scenario: ChatRequestBody['scenario']
+function buildFallback(title: string, message: string): BlueprintResult {
+  const orchestration: Orchestration = {
+    intent: 'unknown',
+    intentLabel: title,
+    parameters: [],
+    context: [],
+    knowledge: [],
+    tools: [],
+    validation: [],
+    action: {
+      id: 'fallback',
+      label: 'Request not recognized',
+      status: 'warning',
+    },
+    state: 'fallback',
+    durationMs: 800,
+    error: { code: 'INTENT_UNKNOWN', message },
+  };
+
+  const systemFacts = [
+    `The assistant could not determine the intent of the user's request.`,
+    `Reason: ${message}`,
+    `Instruction: politely explain what you can help with and suggest supported scenarios.`,
+  ];
+
+  return { orchestration, systemFacts };
+}
+
+function buildFromIntent(
+  intent: Intent,
+  params: IntentParameters
 ): BlueprintResult {
-  switch (scenario) {
-    case 'explain':
-      return buildExplain();
-    case 'understand':
+  switch (intent) {
+    case 'explain_transaction':
+      return buildExplain(params);
+    case 'credit_card_status':
       return buildUnderstand();
-    case 'execute':
-      return buildExecute();
-    case 'recommend':
-      return buildRecommend();
-    case 'orchestrate':
+    case 'transfer':
+      return buildExecute(params);
+    case 'product_recommendation':
+      return buildRecommend(params);
+    case 'pay_utility_bill':
       return buildOrchestrate();
+    case 'unknown':
+      return buildFallback(
+        'Request not recognized',
+        'Я не уверен, что вы имеете в виду. Уточните, пожалуйста.'
+      );
   }
 }
 
@@ -425,7 +596,10 @@ function buildSystemContext(facts: string[], userMessage: string): string {
 
 // ---------- LLM ----------
 
-async function callDeepSeek(systemContext: string, env: Env): Promise<string> {
+async function callDeepSeek(
+  systemContext: string,
+  env: Env
+): Promise<string> {
   const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -470,9 +644,9 @@ export default {
         const body = (await request.json()) as ChatRequestBody;
         const { message, conversationId, scenario } = body;
 
-        if (!message || !conversationId || !scenario) {
+        if (!message || !conversationId) {
           return json(
-            { error: 'message, conversationId and scenario are required' },
+            { error: 'message and conversationId are required' },
             origin,
             400
           );
@@ -493,14 +667,23 @@ export default {
           )
           .run();
 
-        // 2. Build orchestration + system facts
-        const { orchestration, systemFacts } = buildOrchestration(scenario);
+        // 2. Detect intent
+        const detected = await detectIntent(message, scenario, env);
 
-        // 3. LLM answer
+        // 3. Build orchestration
+        const { orchestration, systemFacts } = buildFromIntent(
+          detected.intent,
+          detected.parameters
+        );
+
+        // Добавляем confidence в orchestration
+        orchestration.confidence = detected.confidence;
+
+        // 4. LLM answer
         const systemContext = buildSystemContext(systemFacts, message);
         const answerText = await callDeepSeek(systemContext, env);
 
-        // 4. Save assistant message
+        // 5. Save assistant message
         await env.DB.prepare(
           `INSERT INTO messages (id, conversation_id, user_id, timestamp, role, message)
            VALUES (?, ?, ?, ?, ?, ?)`
@@ -515,7 +698,7 @@ export default {
           )
           .run();
 
-        // 5. Upsert conversation
+        // 6. Upsert conversation
         await env.DB.prepare(
           `INSERT INTO conversations (id, user_id, title, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?)
@@ -562,7 +745,6 @@ export default {
           );
         }
 
-        // Имитация задержки авторизации банком
         await new Promise((r) => setTimeout(r, 600));
 
         const transactionId = `AI-${Date.now().toString().slice(-6)}`;
@@ -573,7 +755,6 @@ export default {
 
         const confirmationText = `Операция выполнена.\n\n${summary}\n\nTransaction ID: ${transactionId}`;
 
-        // Сохраняем как сообщение ассистента
         await env.DB.prepare(
           `INSERT INTO messages (id, conversation_id, user_id, timestamp, role, message)
            VALUES (?, ?, ?, ?, ?, ?)`

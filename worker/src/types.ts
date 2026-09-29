@@ -1,10 +1,49 @@
-export type StatusKind = 'success' | 'warning' | 'progress' | 'error' | 'skipped';
+// ВАЖНО: этот файл дублируется в src/types/orchestration.ts (фронт).
+// При изменении типов — обновить оба файла.
+
+export type StatusKind =
+  | 'success'
+  | 'warning'
+  | 'progress'
+  | 'error'
+  | 'skipped';
 
 export type OrchestrationState =
   | 'completed'
   | 'awaiting_confirmation'
   | 'failed'
   | 'fallback';
+
+export type Intent =
+  | 'explain_transaction'
+  | 'credit_card_status'
+  | 'transfer'
+  | 'product_recommendation'
+  | 'pay_utility_bill'
+  | 'unknown';
+
+export interface IntentParameters {
+  // transfer
+  recipient?: string;
+  amount?: number;
+
+  // explain_transaction
+  period?: string;
+  merchant?: string;
+
+  // product_recommendation
+  term?: number;
+
+  // общее
+  [key: string]: string | number | undefined;
+}
+
+export interface IntentDetectionResult {
+  intent: Intent;
+  parameters: IntentParameters;
+  confidence: number;
+  reasoning: string;
+}
 
 export interface OrchestrationItem {
   id: string;
@@ -45,13 +84,19 @@ export interface Orchestration {
   action: OrchestrationAction;
   state: OrchestrationState;
   durationMs: number;
+  confidence?: number;
   error?: OrchestrationError;
 }
 
 export interface ChatRequest {
   message: string;
   conversationId: string;
-  scenario: 'explain' | 'understand' | 'execute' | 'recommend' | 'orchestrate';
+  scenario?:
+    | 'explain'
+    | 'understand'
+    | 'execute'
+    | 'recommend'
+    | 'orchestrate';
 }
 
 export interface ChatResponse {

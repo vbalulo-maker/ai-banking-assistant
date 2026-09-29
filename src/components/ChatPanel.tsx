@@ -101,11 +101,14 @@ export default function ChatPanel({
 
     const text = pendingPrompt;
     onPendingPromptConsumed?.();
-    void runExchange(text);
+    void runExchange(text, { withScenarioHint: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPrompt, isLoadingHistory, isSending, messages.length]);
 
-  async function runExchange(userText: string) {
+    async function runExchange(
+    userText: string,
+    options?: { withScenarioHint?: boolean }
+  ) {
     setError(null);
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
     setIsSending(true);
@@ -114,7 +117,7 @@ export default function ChatPanel({
       const res = await sendChatMessage({
         message: userText,
         conversationId,
-        scenario,
+        scenario: options?.withScenarioHint ? scenario : undefined,
       });
       setMessages((prev) => [
         ...prev,
