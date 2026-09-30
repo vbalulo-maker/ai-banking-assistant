@@ -1,4 +1,12 @@
-export type StatusKind = 'success' | 'warning' | 'progress' | 'error' | 'skipped';
+// ВАЖНО: этот файл дублируется в worker/src/types.ts.
+// При изменении типов — обновить оба файла.
+
+export type StatusKind =
+  | 'success'
+  | 'warning'
+  | 'progress'
+  | 'error'
+  | 'skipped';
 
 export type OrchestrationState =
   | 'completed'
@@ -34,6 +42,30 @@ export interface OrchestrationError {
   message: string;
 }
 
+// ---------- Handoff ----------
+
+export type HandoffReason =
+  | 'intent_unknown'
+  | 'missing_data'
+  | 'out_of_scope'
+  | 'error';
+
+export type HandoffOptionId = 'retry' | 'human' | 'app';
+
+export interface HandoffOption {
+  id: HandoffOptionId;
+  label: string;
+  primary?: boolean;
+}
+
+export interface Handoff {
+  reason: HandoffReason;
+  message: string;
+  options: HandoffOption[];
+}
+
+// ---------- Orchestration ----------
+
 export interface Orchestration {
   intent: string;
   intentLabel: string;
@@ -46,17 +78,13 @@ export interface Orchestration {
   state: OrchestrationState;
   durationMs: number;
   confidence?: number;
+  handoff?: Handoff;
   error?: OrchestrationError;
 }
 
 export interface ChatRequest {
   message: string;
   conversationId: string;
-  /**
-   * Optional hint for intent detection. When present, the Worker passes
-   * it to the LLM as a weak prior. When absent, the LLM determines the
-   * intent from the message alone.
-   */
   scenario?:
     | 'explain'
     | 'understand'

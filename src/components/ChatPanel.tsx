@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage, fetchMessages } from '../services/api';
 import ConfirmationCard from './ConfirmationCard';
 import DemoMode from './DemoMode';
+import HandoffCard from './HandoffCard';
 import type { ScenarioId } from './ScenarioNav';
-import type { Orchestration } from '../types/orchestration';
+import type {
+  Orchestration,
+  HandoffOption,
+} from '../types/orchestration';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -53,9 +57,6 @@ export default function ChatPanel({
     });
   }, [messages, isSending, isLoadingHistory, orchestrationForCard]);
 
-  // Загрузка истории при смене conversationId.
-  // Используем requestId вместо cancelled-флага, чтобы избежать
-  // проблемы с React.StrictMode (двойной вызов useEffect в dev-режиме).
   useEffect(() => {
     const requestId = ++requestIdRef.current;
 
@@ -89,7 +90,6 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
-  // Отложенный стартовый запрос от родителя (Demo Mode / ScenarioNav).
   useEffect(() => {
     if (!pendingPrompt) return;
     if (isLoadingHistory || isSending) return;
@@ -105,7 +105,7 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPrompt, isLoadingHistory, isSending, messages.length]);
 
-    async function runExchange(
+  async function runExchange(
     userText: string,
     options?: { withScenarioHint?: boolean }
   ) {
@@ -191,6 +191,49 @@ export default function ChatPanel({
     textarea?.focus();
   }
 
+  function handleHandoffOption(optionId: HandoffOption['id']) {
+    // Заглушка до 5.4d-3. Здесь будет вызов /api/handoff.
+    if (optionId === 'retry') {
+      setOrchestrationForCard(null);
+      onOrchestrationChange(null);
+      const textarea = document.querySelector<HTMLTextAreaElement>(
+        '.chat__input'
+      );
+      textarea?.focus();
+      return;
+    }
+
+    if (optionId === 'human') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'Передаю ваш вопрос специалисту. Он подключится к диалогу в течение минуты.',
+        },
+      ]);
+      setOrchestrationForCard(null);
+      onOrchestrationChange(null);
+      onMessageSent?.();
+      return;
+    }
+
+    if (optionId === 'app') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'Откройте приложение банка → раздел «Мои продукты» → выберите нужный продукт. Если что-то пойдёт не так — я рядом и помогу.',
+        },
+      ]);
+      setOrchestrationForCard(null);
+      onOrchestrationChange(null);
+      onMessageSent?.();
+      return;
+    }
+  }
+
   const isEmpty =
     messages.length === 0 && !isSending && !isLoadingHistory;
 
@@ -198,6 +241,11 @@ export default function ChatPanel({
     orchestrationForCard !== null &&
     orchestrationForCard.state === 'awaiting_confirmation' &&
     onConfirmOperation !== undefined;
+
+  const showHandoff =
+    orchestrationForCard !== null &&
+    orchestrationForCard.state === 'fallback' &&
+    orchestrationForCard.handoff !== undefined;
 
   return (
     <div className="chat">
@@ -262,6 +310,15 @@ export default function ChatPanel({
               intent={orchestrationForCard.intent}
               onConfirm={handleConfirm}
               onEdit={handleEdit}
+            />
+          </div>
+        )}
+
+        {showHandoff && orchestrationForCard?.handoff && (
+          <div className="chat__handoff">
+            <HandoffCard
+              handoff={orchestrationForCard.handoff}
+              onOption={handleHandoffOption}
             />
           </div>
         )}
