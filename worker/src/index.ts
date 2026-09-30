@@ -250,13 +250,17 @@ Classify the user's message into EXACTLY ONE of these intents:
 5. pay_utility_bill — user asks to pay a utility bill, check a bill, or pay a received invoice.
 6. unknown — none of the above, or not enough information to decide.
 
+Extract parameters STRICTLY from the user's message. Do NOT invent values.
 Extract parameters where applicable:
-- transfer: recipient (string, name), phone (string, phone number if mentioned), amount (number, in RUB)
-- explain_transaction: period (string, e.g. "last 7 days"), amount (number), merchant (string)
+- transfer: recipient (string, the name AS WRITTEN by the user), phone (string, phone if mentioned), amount (number, in RUB)
+- explain_transaction: period (string), amount (number), merchant (string)
 - product_recommendation: amount (number), term (number, months)
 
-If the user provides a phone number for a transfer, extract it into "phone" (keep the digits, e.g. "+79161234567").
-If the user only provides a name, leave "phone" undefined.
+CRITICAL RULES:
+- If the user says "Сергею" or "Sergey" as recipient, extract "Сергею" / "Sergey" — never substitute with another name.
+- Do NOT use any names from context, examples, or memory. Use ONLY what is present in the user's message.
+- If the recipient is not mentioned, leave "recipient" undefined.
+- If phone is not mentioned, leave "phone" undefined.
 
 Return STRICTLY valid JSON in this format:
 {
@@ -270,12 +274,8 @@ Do not add any text outside JSON. Do not wrap in code fences.`;
 
 async function detectIntent(
   message: string,
-  hint: string | undefined,
   env: Env
 ): Promise<IntentDetectionResult> {
-  const hintLine = hint
-    ? `\n\nHint from UI (may be wrong, use it only as a weak prior): ${hint}`
-    : '';
 
   try {
     const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -288,7 +288,7 @@ async function detectIntent(
         model: env.LLM_MODEL || 'deepseek-chat',
         messages: [
           { role: 'system', content: INTENT_SYSTEM_PROMPT },
-          { role: 'user', content: message + hintLine },
+          { role: 'user', content: message },
         ],
         temperature: 0.0,
         response_format: { type: 'json_object' },
@@ -491,7 +491,10 @@ async function buildUnderstand(
   return { orchestration, systemFacts: facts };
 }
 
-function buildExecute(params: IntentParameters): BlueprintResult {
+function buildExecute(
+  params: IntentParameters,
+  userMessage: string
+):  BlueprintResult {
   const accountsResult = tools.getAccounts() as {
     accounts: { masked: string; balance: number }[];
   };
@@ -524,7 +527,7 @@ function buildExecute(params: IntentParameters): BlueprintResult {
   if (!recipientResult.recipient) {
     // 2а. Если есть имя, но нет телефона — просим телефон
     if (recipientQuery && !phone) {
-      return buildNeedsInputTransfer(recipientQuery, amount);
+      return buildNeedsInputTransfer(recipientQuery, amount, userMessage);
     }
     // 2б. Если есть и имя, и телефон, но не нашли — эскалируем
     if (recipientQuery && phone) {
@@ -533,7 +536,7 @@ function buildExecute(params: IntentParameters): BlueprintResult {
       );
     }
     // 2в. Если вообще нет данных о получателе — тоже просим
-    return buildNeedsInputTransfer('', amount);
+    return buildNeedsInputTransfer('', amount, userMessage);
   }
 
   const r = recipientResult.recipient;
@@ -592,7 +595,8 @@ function buildExecute(params: IntentParameters): BlueprintResult {
 
 function buildNeedsInputTransfer(
   recipientName: string,
-  amount: number
+  amount: number,
+  originalQuery: string
 ): BlueprintResult {
   const promptName = recipientName
     ? `получателя «${recipientName}»`
@@ -610,9 +614,7 @@ function buildNeedsInputTransfer(
         required: true,
       },
     ],
-    originalQuery: recipientName
-      ? `Переведи ${recipientName} ${amount} рублей`
-      : `Переведи ${amount} рублей`,
+    originalQuery,
   };
 
   const orchestration: Orchestration = {
@@ -930,7 +932,7 @@ async function buildFromIntent(
     case 'credit_card_status':
       return buildUnderstand(userMessage, env);
     case 'transfer':
-      return buildExecute(params);
+      return buildExecute(params, userMessage);
     case 'product_recommendation':
       return buildRecommend(params);
     case 'pay_utility_bill':
@@ -1066,7 +1068,7 @@ export default {
           )
           .run();
 
-        const detected = await detectIntent(message, scenario, env);
+        const detected = await detectIntent(message, env);
 
         const { orchestration, systemFacts } = await buildFromIntent(
           detected.intent,

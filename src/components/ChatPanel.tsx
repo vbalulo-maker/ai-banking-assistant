@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage, fetchMessages } from '../services/api';
 import ConfirmationCard from './ConfirmationCard';
+import ClarificationCard from './ClarificationCard';
 import DemoMode from './DemoMode';
 import HandoffCard from './HandoffCard';
 import type { ScenarioId } from './ScenarioNav';
@@ -43,6 +44,7 @@ export default function ChatPanel({
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isClarifying, setIsClarifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orchestrationForCard, setOrchestrationForCard] =
     useState<Orchestration | null>(null);
@@ -55,7 +57,7 @@ export default function ChatPanel({
       top: scrollRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages, isSending, isLoadingHistory, orchestrationForCard]);
+  }, [messages, isSending, isLoadingHistory, orchestrationForCard, isClarifying]);
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
@@ -192,7 +194,6 @@ export default function ChatPanel({
   }
 
   function handleHandoffOption(optionId: HandoffOption['id']) {
-    // Заглушка до 5.4d-3. Здесь будет вызов /api/handoff.
     if (optionId === 'retry') {
       setOrchestrationForCard(null);
       onOrchestrationChange(null);
@@ -234,6 +235,74 @@ export default function ChatPanel({
     }
   }
 
+  async function handleClarificationSubmit(
+    values: Record<string, string>
+  ) {
+    if (!orchestrationForCard?.clarification) return;
+
+    setIsClarifying(true);
+    setError(null);
+
+    const clarification = orchestrationForCard.clarification;
+
+    // Собираем расширенный запрос: исходный + уточнения
+    const additions: string[] = [];
+    clarification.inputs.forEach((input) => {
+      const value = values[input.name]?.trim();
+      if (!value) return;
+      if (input.kind === 'phone') {
+        additions.push(`телефон ${value}`);
+      } else if (input.kind === 'amount') {
+        additions.push(`сумма ${value}`);
+      } else {
+        additions.push(`${input.label.toLowerCase()}: ${value}`);
+      }
+    });
+
+    const extendedQuery = additions.length
+      ? `${clarification.originalQuery}, ${additions.join(', ')}`
+      : clarification.originalQuery;
+
+    // Показываем пользователю, что он ввёл, как обычное сообщение
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: extendedQuery },
+    ]);
+
+    // Скрываем карточку уточнения
+    setOrchestrationForCard(null);
+    onOrchestrationChange(null);
+
+    try {
+      const res = await sendChatMessage({
+        message: extendedQuery,
+        conversationId,
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: res.message.content },
+      ]);
+      setOrchestrationForCard(res.orchestration);
+      onOrchestrationChange(res.orchestration);
+      onMessageSent?.();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Не удалось получить ответ';
+      setError(msg);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'Не удалось продолжить операцию. Попробуйте ещё раз.',
+        },
+      ]);
+    } finally {
+      setIsClarifying(false);
+    }
+  }
+
   const isEmpty =
     messages.length === 0 && !isSending && !isLoadingHistory;
 
@@ -246,6 +315,11 @@ export default function ChatPanel({
     orchestrationForCard !== null &&
     orchestrationForCard.state === 'fallback' &&
     orchestrationForCard.handoff !== undefined;
+
+  const showClarification =
+    orchestrationForCard !== null &&
+    orchestrationForCard.state === 'needs_input' &&
+    orchestrationForCard.clarification !== undefined;
 
   return (
     <div className="chat">
@@ -289,7 +363,7 @@ export default function ChatPanel({
           </div>
         ))}
 
-        {isSending && (
+        {isSending && !isClarifying && (
           <div className="chat__message chat__message--assistant">
             <div className="chat__message-role">Assistant</div>
             <div className="chat__message-content chat__message-content--typing">
@@ -300,6 +374,16 @@ export default function ChatPanel({
                 Generating response…
               </span>
             </div>
+          </div>
+        )}
+
+        {showClarification && orchestrationForCard?.clarification && (
+          <div className="chat__clarification">
+            <ClarificationCard
+              clarification={orchestrationForCard.clarification}
+              onSubmit={handleClarificationSubmit}
+              isSubmitting={isClarifying}
+            />
           </div>
         )}
 
@@ -334,12 +418,12 @@ export default function ChatPanel({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
-          disabled={isSending || isLoadingHistory}
+          disabled={isSending || isLoadingHistory || isClarifying}
         />
         <button
           type="submit"
           className="chat__send"
-          disabled={!input.trim() || isSending || isLoadingHistory}
+          disabled={!input.trim() || isSending || isLoadingHistory || isClarifying}
         >
           Send
         </button>

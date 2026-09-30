@@ -11,6 +11,7 @@ export type StatusKind =
 export type OrchestrationState =
   | 'completed'
   | 'awaiting_confirmation'
+  | 'needs_input'
   | 'failed'
   | 'fallback';
 
@@ -64,6 +65,25 @@ export interface Handoff {
   options: HandoffOption[];
 }
 
+// ---------- Clarification (needs_input) ----------
+
+export type ClarificationInputKind = 'text' | 'phone' | 'amount';
+
+export interface ClarificationInput {
+  name: string;
+  label: string;
+  placeholder?: string;
+  kind: ClarificationInputKind;
+  required?: boolean;
+}
+
+export interface Clarification {
+  reason: string;
+  prompt: string;
+  inputs: ClarificationInput[];
+  originalQuery: string;
+}
+
 // ---------- Orchestration ----------
 
 export interface Orchestration {
@@ -79,6 +99,7 @@ export interface Orchestration {
   durationMs: number;
   confidence?: number;
   handoff?: Handoff;
+  clarification?: Clarification;
   error?: OrchestrationError;
 }
 

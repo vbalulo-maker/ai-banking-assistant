@@ -105,17 +105,27 @@ function normalizePhone(input: string): string {
   return input.replace(/\D/g, '');
 }
 
+function phonesMatch(a: string, b: string): boolean {
+  const na = normalizePhone(a);
+  const nb = normalizePhone(b);
+  if (!na || !nb) return false;
+
+  // Убираем ведущую 7 или 8 — сравниваем 10-значные номера.
+  const strip = (s: string) =>
+    s.length === 11 && (s.startsWith('7') || s.startsWith('8'))
+      ? s.slice(1)
+      : s;
+
+  return strip(na) === strip(nb);
+}
+
 export function getRecipient(
   query: string,
   phone?: string
 ): ToolResult {
-  // 1. Если передан телефон — ищем по нему (приоритетнее).
+  // 1. Если передан телефон — ищем строгое совпадение.
   if (phone) {
-    const phoneDigits = normalizePhone(phone);
-    const foundByPhone = RECIPIENTS.find(
-      (r) => normalizePhone(r.phone).endsWith(phoneDigits.slice(-7)) ||
-        normalizePhone(r.phone).includes(phoneDigits)
-    );
+    const foundByPhone = RECIPIENTS.find((r) => phonesMatch(r.phone, phone));
     if (foundByPhone) {
       return { recipient: foundByPhone, matchedBy: 'phone' };
     }
