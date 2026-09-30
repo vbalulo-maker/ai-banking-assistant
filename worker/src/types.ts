@@ -11,6 +11,7 @@ export type StatusKind =
 export type OrchestrationState =
   | 'completed'
   | 'awaiting_confirmation'
+  | 'needs_input'
   | 'failed'
   | 'fallback';
 
@@ -24,6 +25,7 @@ export type Intent =
 
 export interface IntentParameters {
   recipient?: string;
+  phone?: string;
   amount?: number;
   period?: string;
   merchant?: string;
@@ -88,6 +90,31 @@ export interface Handoff {
   options: HandoffOption[];
 }
 
+// ---------- Clarification (needs_input) ----------
+
+export type ClarificationInputKind = 'text' | 'phone' | 'amount';
+
+export interface ClarificationInput {
+  name: string;
+  label: string;
+  placeholder?: string;
+  kind: ClarificationInputKind;
+  required?: boolean;
+}
+
+export interface Clarification {
+  reason: string;
+  prompt: string;
+  inputs: ClarificationInput[];
+  /**
+   * Часть исходного пользовательского запроса, к которому нужно
+   * добавить уточнение перед повторным вызовом /api/chat.
+   * Например: "Переведи Сергею Петрову 5 000 рублей" → после уточнения
+   * телефона: "Переведи Сергею Петрову 5 000 рублей, телефон +7 ...".
+   */
+  originalQuery: string;
+}
+
 // ---------- Orchestration ----------
 
 export interface Orchestration {
@@ -103,6 +130,7 @@ export interface Orchestration {
   durationMs: number;
   confidence?: number;
   handoff?: Handoff;
+  clarification?: Clarification;
   error?: OrchestrationError;
 }
 

@@ -73,37 +73,71 @@ export function calculateDepositReturn(
 
 // ---------- Recipient / Transfer ----------
 
-const RECIPIENTS = [
+interface Recipient {
+  name: string;
+  aliases: string[];
+  bank: string;
+  phone: string;
+  accountMasked: string;
+  verified: boolean;
+}
+
+const RECIPIENTS: Recipient[] = [
   {
     name: 'Anna Petrova',
     aliases: ['Anna', 'Анна', 'Анне', 'Петрова'],
     bank: 'Example Bank',
-    phone: '+7 9XX XXX XX XX',
+    phone: '+7 916 123 45 67',
     accountMasked: '••4832',
     verified: true,
   },
   {
     name: 'Ivan Sidorov',
-    aliases: ['Ivan', 'Иван'],
+    aliases: ['Ivan', 'Иван', 'Ивану', 'Сидоров'],
     bank: 'Example Bank',
-    phone: '+7 9XX XXX XX XX',
+    phone: '+7 925 987 65 43',
     accountMasked: '••1122',
     verified: true,
   },
 ];
 
-export function getRecipient(query: string): ToolResult {
-  const q = query.toLowerCase();
-  const found = RECIPIENTS.find(
-    (r) =>
-      r.name.toLowerCase().includes(q) ||
-      r.aliases.some((a) => a.toLowerCase().includes(q))
-  );
-  return found ? { recipient: found } : { error: 'not_found', query };
+function normalizePhone(input: string): string {
+  return input.replace(/\D/g, '');
+}
+
+export function getRecipient(
+  query: string,
+  phone?: string
+): ToolResult {
+  // 1. Если передан телефон — ищем по нему (приоритетнее).
+  if (phone) {
+    const phoneDigits = normalizePhone(phone);
+    const foundByPhone = RECIPIENTS.find(
+      (r) => normalizePhone(r.phone).endsWith(phoneDigits.slice(-7)) ||
+        normalizePhone(r.phone).includes(phoneDigits)
+    );
+    if (foundByPhone) {
+      return { recipient: foundByPhone, matchedBy: 'phone' };
+    }
+  }
+
+  // 2. Ищем по имени.
+  const q = query.toLowerCase().trim();
+  if (q) {
+    const foundByName = RECIPIENTS.find(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.aliases.some((a) => a.toLowerCase().includes(q))
+    );
+    if (foundByName) {
+      return { recipient: foundByName, matchedBy: 'name' };
+    }
+  }
+
+  return { error: 'not_found', query, phone };
 }
 
 export function calculateTransferFee(amount: number): ToolResult {
-  // Illustrative rule: no fee up to 100 000 ₽, 1% выше
   const fee = amount > 100000 ? Math.round(amount * 0.01) : 0;
   return { amount, fee, currency: 'RUB' };
 }
@@ -111,8 +145,6 @@ export function calculateTransferFee(amount: number): ToolResult {
 // ---------- Documents (orchestrate) ----------
 
 export function parseDocument(): ToolResult {
-  // accountMasked — счёт списания клиента в банке (совпадает
-  // с accounts[0].masked в customer.json).
   return {
     supplier: 'Example Energy',
     accountMasked: '••84',

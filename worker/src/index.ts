@@ -9,6 +9,8 @@ import type {
   IntentDetectionResult,
   KnowledgeChunkRow,
   RetrievedChunk,
+  Clarification,
+  ClarificationInput,
 } from './types';
 import * as tools from './tools';
 import { KNOWLEDGE_DOCUMENTS, chunkDocument } from './knowledge';
@@ -99,6 +101,27 @@ function knowledge(
 
 function formatRub(value: number): string {
   return value.toLocaleString('ru-RU') + ' ₽';
+}
+
+function maskName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return fullName;
+  if (parts.length === 1) return parts[0];
+  const first = parts[0];
+  const lastInitial = parts[1].charAt(0).toUpperCase();
+  return `${first} ${lastInitial}.`;
+}
+
+function maskPhone(phone: string): string {
+  // Оставляем первые 4 символа (например "+7 9") и последние 6.
+  // Всё остальное — "•••".
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 10) return phone;
+
+  const countryAndOperator = phone.slice(0, 4).trim();
+  const lastDigits = digits.slice(-4);
+  const formatted = lastDigits.replace(/(\d{2})(\d{2})/, '$1 $2');
+  return `${countryAndOperator} ••• ${formatted}`;
 }
 
 // ---------- Embeddings ----------
@@ -228,9 +251,12 @@ Classify the user's message into EXACTLY ONE of these intents:
 6. unknown — none of the above, or not enough information to decide.
 
 Extract parameters where applicable:
-- transfer: recipient (string), amount (number, in RUB)
+- transfer: recipient (string, name), phone (string, phone number if mentioned), amount (number, in RUB)
 - explain_transaction: period (string, e.g. "last 7 days"), amount (number), merchant (string)
 - product_recommendation: amount (number), term (number, months)
+
+If the user provides a phone number for a transfer, extract it into "phone" (keep the digits, e.g. "+79161234567").
+If the user only provides a name, leave "phone" undefined.
 
 Return STRICTLY valid JSON in this format:
 {
@@ -472,35 +498,53 @@ function buildExecute(params: IntentParameters): BlueprintResult {
   const sourceAccount = accountsResult.accounts[0];
 
   const recipientQuery =
-    typeof params.recipient === 'string' ? params.recipient : 'Anna';
-
-  const recipientResult = tools.getRecipient(recipientQuery) as {
-    recipient?: {
-      name: string;
-      bank: string;
-      accountMasked: string;
-      verified: boolean;
-    };
-    error?: string;
-  };
-
-  if (!recipientResult.recipient) {
-    return buildMissingDataFallback(
-      `получатель «${recipientQuery}» не найден в ваших контактах`
-    );
-  }
-  const r = recipientResult.recipient;
+    typeof params.recipient === 'string' ? params.recipient.trim() : '';
+  const phone =
+    typeof params.phone === 'string' ? params.phone.trim() : undefined;
 
   const amount =
     typeof params.amount === 'number' && params.amount > 0
       ? params.amount
       : 50000;
 
+  // --- 1. Ищем получателя ---
+  const recipientResult = tools.getRecipient(recipientQuery, phone) as {
+    recipient?: {
+      name: string;
+      bank: string;
+      accountMasked: string;
+      phone: string;
+      verified: boolean;
+    };
+    matchedBy?: 'name' | 'phone';
+    error?: string;
+  };
+
+  // --- 2. Если получателя не нашли ---
+  if (!recipientResult.recipient) {
+    // 2а. Если есть имя, но нет телефона — просим телефон
+    if (recipientQuery && !phone) {
+      return buildNeedsInputTransfer(recipientQuery, amount);
+    }
+    // 2б. Если есть и имя, и телефон, но не нашли — эскалируем
+    if (recipientQuery && phone) {
+      return buildMissingDataFallback(
+        `получатель «${recipientQuery}» с телефоном «${phone}» не найден в системе СБП`
+      );
+    }
+    // 2в. Если вообще нет данных о получателе — тоже просим
+    return buildNeedsInputTransfer('', amount);
+  }
+
+  const r = recipientResult.recipient;
   const feeResult = tools.calculateTransferFee(amount) as { fee: number };
   const total = amount + feeResult.fee;
 
+  const displayName = maskName(r.name);
+  const displayPhone = maskPhone(r.phone);
+
   const facts = [
-    `Recipient verified: ${r.name}, ${r.bank}, account ${r.accountMasked}`,
+    `Recipient verified: ${displayName}, ${r.bank}, phone ${displayPhone}, account ${r.accountMasked}`,
     `Amount: ${formatRub(amount)}`,
     `Fee: ${formatRub(feeResult.fee)}`,
     `Total: ${formatRub(total)}`,
@@ -514,13 +558,14 @@ function buildExecute(params: IntentParameters): BlueprintResult {
     intent: 'transfer',
     intentLabel: 'Transfer',
     parameters: [
-      param('recipient', 'Recipient', r.name),
+      param('recipient', 'Recipient', displayName),
+      param('phone', 'Phone', displayPhone),
       param('amount', 'Amount', formatRub(amount)),
       param('fee', 'Fee', formatRub(feeResult.fee)),
       param('total', 'Total', formatRub(total)),
     ],
     context: [
-      item('recipient', `Recipient found: ${r.name}`),
+      item('recipient', `Recipient found: ${displayName}`),
       item('account', `Account ${sourceAccount.masked} available`),
     ],
     knowledge: [],
@@ -543,6 +588,75 @@ function buildExecute(params: IntentParameters): BlueprintResult {
   };
 
   return { orchestration, systemFacts: facts };
+}
+
+function buildNeedsInputTransfer(
+  recipientName: string,
+  amount: number
+): BlueprintResult {
+  const promptName = recipientName
+    ? `получателя «${recipientName}»`
+    : 'получателя';
+
+  const clarification: Clarification = {
+    reason: 'recipient_not_found',
+    prompt: `Я не нашёл ${promptName} в ваших контактах и истории переводов. Уточните, пожалуйста, номер телефона — я поищу через СБП.`,
+    inputs: [
+      {
+        name: 'phone',
+        label: 'Телефон получателя',
+        placeholder: '+7 900 000 00 00',
+        kind: 'phone',
+        required: true,
+      },
+    ],
+    originalQuery: recipientName
+      ? `Переведи ${recipientName} ${amount} рублей`
+      : `Переведи ${amount} рублей`,
+  };
+
+  const orchestration: Orchestration = {
+    intent: 'transfer',
+    intentLabel: 'Transfer — awaiting details',
+    parameters: [
+      ...(recipientName
+        ? [param('recipient', 'Recipient', recipientName)]
+        : []),
+      param('amount', 'Amount', formatRub(amount)),
+    ],
+    context: [
+      item(
+        'recipient_lookup',
+        recipientName
+          ? `Recipient «${recipientName}» not found in contacts`
+          : 'Recipient not specified',
+        'warning'
+      ),
+    ],
+    knowledge: [],
+    tools: [item('get_recipient', 'get_recipient', 'warning')],
+    validation: [],
+    action: {
+      id: 'clarification_required',
+      label: 'Details required',
+      status: 'warning',
+    },
+    state: 'needs_input',
+    durationMs: 600,
+    clarification,
+  };
+
+  const systemFacts = [
+    `The assistant is preparing a transfer.`,
+    `Recipient: ${recipientName || '(not specified)'}.`,
+    `Amount: ${formatRub(amount)}.`,
+    `The recipient is not found in the customer's contacts.`,
+    `Ask the customer for the recipient's phone number — the assistant will search via the Faster Payments System (СБП).`,
+    `Do NOT mention human support. This is a routine clarification, not an escalation.`,
+    `Tone: warm, brief, helpful.`,
+  ];
+
+  return { orchestration, systemFacts };
 }
 
 function buildRecommend(params: IntentParameters): BlueprintResult {
