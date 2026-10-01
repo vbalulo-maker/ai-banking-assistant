@@ -259,6 +259,7 @@ Extract parameters where applicable:
 CRITICAL RULES:
 - If the user says "Сергею" or "Sergey" as recipient, extract "Сергею" / "Sergey" — never substitute with another name.
 - Do NOT use any names from context, examples, or memory. Use ONLY what is present in the user's message.
+- Family roles ("мама", "папа", "жена", "муж", "брат", "сестра", "сын", "дочь", "маме", "папе", etc.) are NOT names. Do NOT extract them into "recipient". Leave "recipient" undefined for family roles — the assistant will ask for the actual name or phone.
 - If the recipient is not mentioned, leave "recipient" undefined.
 - If phone is not mentioned, leave "phone" undefined.
 
@@ -525,18 +526,17 @@ function buildExecute(
 
   // --- 2. Если получателя не нашли ---
   if (!recipientResult.recipient) {
-    // 2а. Если есть имя, но нет телефона — просим телефон
-    if (recipientQuery && !phone) {
-      return buildNeedsInputTransfer(recipientQuery, amount, userMessage);
-    }
-    // 2б. Если есть и имя, и телефон, но не нашли — эскалируем
-    if (recipientQuery && phone) {
+    // Если телефон передан — значит мы уже искали. Не нашли — fallback.
+    if (phone) {
       return buildMissingDataFallback(
-        `получатель «${recipientQuery}» с телефоном «${phone}» не найден в системе СБП`
+        recipientQuery
+          ? `получатель с именем «${recipientQuery}» и телефоном ${phone} не найден в системе СБП`
+          : `получатель с телефоном ${phone} не найден в системе СБП`
       );
     }
-    // 2в. Если вообще нет данных о получателе — тоже просим
-    return buildNeedsInputTransfer('', amount, userMessage);
+
+    // Телефона нет — просим его.
+    return buildNeedsInputTransfer(recipientQuery, amount, userMessage);
   }
 
   const r = recipientResult.recipient;
@@ -854,27 +854,35 @@ function buildMissingDataFallback(reason: string): BlueprintResult {
     validation: [],
     action: {
       id: 'handoff',
-      label: 'Offer human specialist',
+      label: 'Offer alternatives',
       status: 'warning',
     },
     state: 'fallback',
     durationMs: 800,
     handoff: {
       reason: 'missing_data',
-      message: `Хочу помочь, но у меня не хватает данных: ${reason}. Передам специалисту — он проверит детали и решит вопрос.`,
+      message: `Я не смог подготовить перевод: ${reason}. Давайте попробуем ещё раз — вот что можно сделать.`,
       options: [
-        { id: 'human', label: 'Позвать специалиста', primary: true },
-        { id: 'retry', label: 'Попробовать снова', primary: false },
+        { id: 'retry', label: 'Попробовать снова', primary: true },
+        { id: 'human', label: 'Позвать специалиста', primary: false },
       ],
     },
   };
 
   const systemFacts = [
-    `The assistant could not complete the request because of missing data: ${reason}.`,
-    `Briefly empathize with the customer.`,
-    `Explain that a human specialist will pick up the case and usually resolves it within a few minutes.`,
-    `Be warm, brief, respectful. Do NOT use the phrase "обратитесь в поддержку".`,
-    `Address the customer as «вы».`,
+    `The assistant could not prepare the operation because: ${reason}.`,
+    ``,
+    `Follow this structure in your reply:`,
+    `1) One short, warm sentence acknowledging the situation.`,
+    `2) Do NOT say "перевод не прошёл" or "операция не выполнена". Say "не удалось подготовить перевод" / "получателя нет в системе СБП".`,
+    `3) Give the customer 2-3 concrete alternatives to try, for example:`,
+    `   • проверить номер телефона — возможно, получатель использует другой банк или не подключён к СБП;`,
+    `   • назвать имя и фамилию получателя, если это возможно;`,
+    `   • если получатель новый — сначала добавить его в контакты.`,
+    `4) Only after listing alternatives — mention that a human specialist can be connected if needed.`,
+    `5) Do NOT put the reason in quotes inside your reply. Rewrite it naturally in Russian.`,
+    `6) Do NOT use the phrase "обратитесь в поддержку".`,
+    `7) Address the customer as «вы». Be warm and brief.`,
   ];
 
   return { orchestration, systemFacts };
