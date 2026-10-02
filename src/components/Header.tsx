@@ -25,7 +25,7 @@ export default function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
       </div>
 
       <div className="header__right">
-        <span className="header__label">Concept prototype</span>
+        <span className="header__label">Валерий Балуло</span>
         <div className="header__customer">
           <span className="header__dot" />
           <span>Customer</span>
