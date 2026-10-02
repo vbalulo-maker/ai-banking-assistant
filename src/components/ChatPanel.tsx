@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { sendChatMessage, fetchMessages } from '../services/api';
+import { sendChatMessage, fetchMessages, requestHumanHandoff } from '../services/api';
 import ConfirmationCard from './ConfirmationCard';
 import ClarificationCard from './ClarificationCard';
 import DemoMode from './DemoMode';
@@ -193,7 +193,7 @@ export default function ChatPanel({
     textarea?.focus();
   }
 
-  function handleHandoffOption(optionId: HandoffOption['id']) {
+    async function handleHandoffOption(optionId: HandoffOption['id']) {
     if (optionId === 'retry') {
       setOrchestrationForCard(null);
       onOrchestrationChange(null);
@@ -205,17 +205,58 @@ export default function ChatPanel({
     }
 
     if (optionId === 'human') {
+      if (!orchestrationForCard?.handoff) return;
+
+      setOrchestrationForCard(null);
+      onOrchestrationChange(null);
+      setIsClarifying(true);
+
+      // Показываем сообщение-заглушку "Подключаем..."
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content:
-            'Передаю ваш вопрос специалисту. Он подключится к диалогу в течение минуты.',
+          content: 'Подключаю специалиста…',
         },
       ]);
-      setOrchestrationForCard(null);
-      onOrchestrationChange(null);
-      onMessageSent?.();
+
+      try {
+        const res = await requestHumanHandoff({
+          conversationId,
+          reason: orchestrationForCard.handoff.reason,
+          message: orchestrationForCard.handoff.message,
+        });
+
+        // Убираем "Подключаю..." и добавляем сообщение оператора
+        setMessages((prev) => {
+          const withoutLast = prev.slice(0, -1);
+          return [
+            ...withoutLast,
+            {
+              role: 'assistant',
+              content: `${res.message}\n\nОжидаемое время: ${res.eta}.`,
+            },
+          ];
+        });
+
+        onMessageSent?.();
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : 'Не удалось подключить специалиста';
+        setMessages((prev) => {
+          const withoutLast = prev.slice(0, -1);
+          return [
+            ...withoutLast,
+            {
+              role: 'assistant',
+              content: `Не удалось подключить специалиста: ${msg}. Попробуйте позже или напишите вопрос в чате — я постараюсь помочь.`,
+            },
+          ];
+        });
+      } finally {
+        setIsClarifying(false);
+      }
+
       return;
     }
 

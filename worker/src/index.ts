@@ -1023,6 +1023,78 @@ export default {
       return json({ status: 'ok' }, origin);
     }
 
+        if (url.pathname === '/api/handoff' && request.method === 'POST') {
+      try {
+        const body = (await request.json()) as {
+          conversationId: string;
+          reason: string;
+          message: string;
+        };
+
+        if (!body.conversationId) {
+          return json(
+            { error: 'conversationId is required' },
+            origin,
+            400
+          );
+        }
+
+        // Имитация времени подключения оператора
+        await new Promise((r) => setTimeout(r, 800));
+
+        const operators = [
+          { name: 'Анна', role: 'Специалист поддержки' },
+          { name: 'Михаил', role: 'Специалист поддержки' },
+          { name: 'Елена', role: 'Старший специалист' },
+        ];
+        const operator =
+          operators[Math.floor(Math.random() * operators.length)];
+
+        const ticketId = `HD-${Date.now().toString().slice(-6)}`;
+        const eta = '1–2 минуты';
+
+        // Сохраняем сообщение оператора в D1
+        const operatorMessage =
+          `Здравствуйте! Меня зовут ${operator.name}, я ${operator.role.toLowerCase()}. ` +
+          `Возьму ваш вопрос на себя — обычно это занимает ${eta}. ` +
+          `Ваш тикет: ${ticketId}.`;
+
+        await env.DB.prepare(
+          `INSERT INTO messages (id, conversation_id, user_id, timestamp, role, message)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+          .bind(
+            crypto.randomUUID(),
+            body.conversationId,
+            'demo_user',
+            Date.now(),
+            'assistant',
+            operatorMessage
+          )
+          .run();
+
+        return json(
+          {
+            status: 'connected',
+            operator,
+            eta,
+            ticketId,
+            message: operatorMessage,
+          },
+          origin
+        );
+      } catch (err) {
+        return json(
+          {
+            error: 'handoff failed',
+            details: err instanceof Error ? err.message : String(err),
+          },
+          origin,
+          500
+        );
+      }
+    }
+
     if (
       url.pathname === '/api/admin/index-knowledge' &&
       request.method === 'POST'

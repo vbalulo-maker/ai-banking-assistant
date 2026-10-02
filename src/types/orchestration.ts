@@ -140,3 +140,22 @@ export interface ExecuteResponse {
   transactionId: string;
   message: string;
 }
+
+export interface HandoffRequest {
+  conversationId: string;
+  reason: string;
+  message: string;
+}
+
+export interface HandoffOperator {
+  name: string;
+  role: string;
+}
+
+export interface HandoffResponse {
+  status: 'connected';
+  operator: HandoffOperator;
+  eta: string;
+  ticketId: string;
+  message: string;
+}

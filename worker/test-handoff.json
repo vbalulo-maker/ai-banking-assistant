@@ -1,0 +1,5 @@
+{
+  "conversationId": "handoff-curl-test-1",
+  "reason": "missing_data",
+  "message": "получатель не найден"
+}

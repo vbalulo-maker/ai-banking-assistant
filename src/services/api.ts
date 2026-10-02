@@ -81,3 +81,27 @@ export async function executeOperation(
 
   return data as ExecuteResponse;
 }
+
+import type {
+  HandoffRequest,
+  HandoffResponse,
+} from '../types/orchestration';
+
+export async function requestHumanHandoff(
+  payload: HandoffRequest
+): Promise<HandoffResponse> {
+  const res = await fetch(`${API_BASE}/api/handoff`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = (await res.json()) as HandoffResponse | ApiError;
+
+  if (!res.ok || 'error' in data) {
+    const err = data as ApiError;
+    throw new Error(err.details || err.error || `HTTP ${res.status}`);
+  }
+
+  return data as HandoffResponse;
+}
