@@ -371,7 +371,7 @@ export default function ChatPanel({
 
         {isEmpty && !onDemoScenario && (
           <div className="chat__empty">
-            <h2 className="chat__empty-title">What can I help you with?</h2>
+            <h2 className="chat__empty-title">Чем могу помочь?</h2>
             <p className="chat__empty-subtitle">
               Выберите сценарий внизу или напишите свой запрос.
             </p>
@@ -398,7 +398,7 @@ export default function ChatPanel({
             }
           >
             <div className="chat__message-role">
-              {msg.role === 'user' ? 'Вы' : 'Assistant'}
+              {msg.role === 'user' ? 'Вы' : 'ИИ-ассистент'}
             </div>
             <div className="chat__message-content">{msg.content}</div>
           </div>
@@ -406,7 +406,7 @@ export default function ChatPanel({
 
         {isSending && !isClarifying && (
           <div className="chat__message chat__message--assistant">
-            <div className="chat__message-role">Assistant</div>
+            <div className="chat__message-role">ИИ-ассистент</div>
             <div className="chat__message-content chat__message-content--typing">
               <span className="chat__dot" />
               <span className="chat__dot" />
@@ -454,7 +454,7 @@ export default function ChatPanel({
       <form className="chat__input-form" onSubmit={handleSubmit}>
         <textarea
           className="chat__input"
-          placeholder="Например: «Переведи Анне 50 000 ₽»"
+          placeholder="Напишите, что вам нужно сделать"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -466,7 +466,7 @@ export default function ChatPanel({
           className="chat__send"
           disabled={!input.trim() || isSending || isLoadingHistory || isClarifying}
         >
-          Send
+          Отправить
         </button>
       </form>
     </div>

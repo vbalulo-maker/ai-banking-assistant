@@ -17,9 +17,9 @@ export default function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
           ☰
         </button>
         <div className="header__brand">
-          <h1 className="header__title">AI Assistant</h1>
+          <h1 className="header__title">ИИ-ассистент</h1>
           <span className="header__subtitle">
-            A new interaction layer for digital banking
+            Daily Banking
           </span>
         </div>
       </div>

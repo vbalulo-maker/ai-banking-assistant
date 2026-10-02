@@ -12,11 +12,11 @@ interface Scenario {
 }
 
 const SCENARIOS: Scenario[] = [
-  { id: 'explain', index: '01', label: 'Explain' },
-  { id: 'understand', index: '02', label: 'Understand' },
-  { id: 'execute', index: '03', label: 'Execute' },
-  { id: 'recommend', index: '04', label: 'Recommend' },
-  { id: 'orchestrate', index: '05', label: 'Orchestrate' },
+  { id: 'explain', index: '01', label: 'Объяснить' },
+  { id: 'understand', index: '02', label: 'Понять' },
+  { id: 'execute', index: '03', label: 'Выполнить' },
+  { id: 'recommend', index: '04', label: 'Подобрать' },
+  { id: 'orchestrate', index: '05', label: 'Оркестрировать' },
 ];
 
 interface ScenarioNavProps {

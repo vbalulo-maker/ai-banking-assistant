@@ -10,28 +10,28 @@ interface DemoScenario {
 const DEMO_SCENARIOS: DemoScenario[] = [
   {
     id: 'explain',
-    title: 'Explain a transaction',
-    description: 'Понять непонятное списание по карте',
+    title: 'Объяснить списание',
+    description: 'Понять непонятную операцию по карте',
   },
   {
     id: 'understand',
-    title: 'Understand credit card',
-    description: 'Сколько платить, чтобы не попасть на проценты',
+    title: 'Статус кредитки',
+    description: 'Сколько заплатить, чтобы не попасть на проценты',
   },
   {
     id: 'execute',
-    title: 'Transfer money',
+    title: 'Перевести деньги',
     description: 'Подготовить и подтвердить перевод',
   },
   {
     id: 'recommend',
-    title: 'Compare products',
+    title: 'Подобрать продукт',
     description: 'Куда разместить средства на 6 месяцев',
   },
   {
     id: 'orchestrate',
-    title: 'Pay a utility bill',
-    description: 'Проверить счёт и оплатить коммуналку',
+    title: 'Оплатить коммуналку',
+    description: 'Проверить счёт и оплатить',
   },
 ];
 
@@ -42,7 +42,7 @@ interface DemoModeProps {
 export default function DemoMode({ onSelect }: DemoModeProps) {
   return (
     <div className="demo">
-      <h2 className="demo__title">What can I help you with?</h2>
+      <h2 className="demo__title">Чем могу помочь?</h2>
       <p className="demo__subtitle">
         Выберите сценарий или напишите свой запрос.
       </p>

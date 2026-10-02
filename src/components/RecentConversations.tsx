@@ -79,7 +79,7 @@ export default function RecentConversations({
   return (
     <div className="recent">
       <div className="recent__header">
-        <h3 className="recent__title">Recent conversations</h3>
+        <h3 className="recent__title">История диалогов</h3>
         <button
           type="button"
           className="recent__refresh"

@@ -183,7 +183,7 @@ export default function App() {
       <footer className="app__footer">
         <ScenarioNav active={scenario} onChange={handleScenarioChange} />
         <div className="app__footer-note">
-          Synthetic data · Mock banking APIs · Concept only
+          Вымышленные данные · Mock-API банка · Только концепт
         </div>
       </footer>
     </div>
