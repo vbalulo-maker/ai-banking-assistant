@@ -6,6 +6,7 @@ import OrchestrationPanel from './components/OrchestrationPanel';
 import ScenarioNav, { type ScenarioId } from './components/ScenarioNav';
 import { executeOperation } from './services/api';
 import { SCENARIO_PROMPTS } from './data/scenarios';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import type { Orchestration } from './types/orchestration';
 
 const CONVERSATION_KEY = 'ai-banking:conversationId';
@@ -60,6 +61,8 @@ function createConversationId(scenario: ScenarioId): string {
 }
 
 export default function App() {
+  const isMobile = useMediaQuery('(max-width: 900px)');
+
   const [scenario, setScenario] = useState<ScenarioId>('explain');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(
     readStoredSidebarOpen
@@ -87,7 +90,6 @@ export default function App() {
     conversationIds[scenario] ?? createConversationId(scenario);
 
   function handleScenarioChange(next: ScenarioId) {
-    // Клик по активному сценарию = новый диалог + перезапуск
     if (next === scenario) {
       const newId = createConversationId(next);
       const updated = { ...conversationIds, [next]: newId };
@@ -99,7 +101,6 @@ export default function App() {
   }
 
   const handleDemoScenario = useCallback((next: ScenarioId) => {
-    // Всегда создаём свежий диалог для сценария из Demo Mode
     const newId = createConversationId(next);
     setConversationIds((prev) => {
       const updated = { ...prev, [next]: newId };
@@ -116,8 +117,6 @@ export default function App() {
       setConversationIds(updated);
       writeStoredConversationIds(updated);
       setScenario(nextScenario);
-      // НЕ выставляем pendingPrompt: пользователь вернулся к
-      // старому диалогу, ChatPanel загрузит историю из D1.
       setPendingPrompt(null);
     },
     [conversationIds]
@@ -147,7 +146,7 @@ export default function App() {
   }
 
   function handleEditOperation() {
-    // Placeholder: редактирование операции пока не реализовано.
+    // Placeholder
   }
 
   return (
@@ -175,9 +174,11 @@ export default function App() {
           pendingPrompt={pendingPrompt}
           onPendingPromptConsumed={() => setPendingPrompt(null)}
         />
-        <aside className="app__aside">
-          <OrchestrationPanel orchestration={orchestration} />
-        </aside>
+        {!isMobile && (
+          <aside className="app__aside">
+            <OrchestrationPanel orchestration={orchestration} />
+          </aside>
+        )}
       </div>
 
       <footer className="app__footer">

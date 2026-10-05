@@ -50,13 +50,18 @@ button {
   background: none;
 }
 
-/* ---------- Layout ---------- */
+/* ============================================
+   Layout
+   ============================================ */
 
 .app {
   display: grid;
   grid-template-rows: 64px 1fr auto;
+  grid-template-columns: 100%;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
+  overflow: hidden;
 }
 
 .app__body {
@@ -67,6 +72,10 @@ button {
   transition: grid-template-columns 200ms ease;
 }
 
+.app--sidebar-open .app__body {
+  grid-template-columns: 280px 1fr 420px;
+}
+
 .app__aside {
   display: flex;
   flex-direction: column;
@@ -75,22 +84,19 @@ button {
   overflow: hidden;
 }
 
-.app--sidebar-open .app__body {
-  grid-template-columns: 280px 1fr 420px;
+.app__footer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-@media (max-width: 900px) {
-  .app__body,
-  .app--sidebar-open .app__body {
-    grid-template-columns: 1fr;
-  }
-  .app__aside,
-  .sidebar {
-    display: none;
-  }
+.app__overlay {
+  display: none;
 }
 
-/* ---------- Header ---------- */
+/* ============================================
+   Header
+   ============================================ */
 
 .header {
   display: flex;
@@ -99,6 +105,12 @@ button {
   padding: 0 24px;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
+}
+
+.header__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .header__brand {
@@ -150,7 +162,53 @@ button {
   background: var(--success);
 }
 
-/* ---------- Panels ---------- */
+.header__sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  color: var(--text-secondary);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.header__sidebar-toggle:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   Sidebar
+   ============================================ */
+
+.sidebar {
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+  transition: opacity 150ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar__inner {
+  width: 280px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px 12px;
+  min-height: 0;
+}
+
+/* ============================================
+   Panels (устаревшие)
+   ============================================ */
 
 .panel {
   overflow-y: auto;
@@ -174,16 +232,24 @@ button {
   font-style: italic;
 }
 
-/* ---------- Footer / ScenarioNav ---------- */
+/* ============================================
+   Footer / ScenarioNav
+   ============================================ */
 
 .scenario-nav {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 24px;
+  padding: 0 16px;
   background: var(--bg-card);
   border-top: 1px solid var(--border);
   overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scenario-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .scenario-nav__item {
@@ -214,7 +280,16 @@ button {
   opacity: 0.6;
 }
 
-/* ---------- Utility ---------- */
+.scenario-nav__item--active .scenario-nav__index {
+  opacity: 1;
+}
+
+.scenario-nav__item--active::after {
+  content: '↻';
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.6;
+}
 
 .app__footer-note {
   padding: 4px 24px;
@@ -224,7 +299,9 @@ button {
   border-top: 1px solid var(--border);
 }
 
-/* ---------- ChatPanel ---------- */
+/* ============================================
+   ChatPanel
+   ============================================ */
 
 .chat {
   display: flex;
@@ -295,6 +372,7 @@ button {
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .chat__message--user .chat__message-content {
@@ -306,8 +384,16 @@ button {
 .chat__message-content--typing {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 14px 16px;
+  gap: 6px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chat__typing-label {
+  margin-left: 4px;
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 .chat__dot {
@@ -341,6 +427,20 @@ button {
   margin-top: 4px;
 }
 
+.chat__history-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px 0;
+  font-style: italic;
+}
+
+.chat__history-label {
+  margin-left: 4px;
+}
+
 .chat__input-form {
   display: flex;
   gap: 8px;
@@ -352,6 +452,7 @@ button {
 
 .chat__input {
   flex: 1;
+  min-width: 0;
   resize: none;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -385,6 +486,7 @@ button {
   font-size: 13px;
   font-weight: 500;
   transition: background 120ms ease;
+  flex-shrink: 0;
 }
 
 .chat__send:hover:not(:disabled) {
@@ -396,7 +498,9 @@ button {
   cursor: not-allowed;
 }
 
-/* ---------- Orchestration panel ---------- */
+/* ============================================
+   Orchestration panel
+   ============================================ */
 
 .orch-panel {
   display: flex;
@@ -449,7 +553,10 @@ button {
   animation: orch-panel-fade 200ms ease;
 }
 
-/* ---------- Orchestration content ---------- */
+@keyframes orch-panel-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .orch {
   display: flex;
@@ -461,6 +568,18 @@ button {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  animation: orch-section-appear 320ms ease both;
+}
+
+@keyframes orch-section-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .orch__section-title {
@@ -499,14 +618,64 @@ button {
   flex: 1;
 }
 
+.orch__source {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.orch__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+
+.orch__icon--success {
+  color: var(--success);
+  background: #ecfdf5;
+}
+
+.orch__icon--warning {
+  color: var(--warning);
+  background: #fffbeb;
+}
+
+.orch__icon--progress {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  animation: orch-icon-pulse 1.4s infinite ease-in-out;
+}
+
+.orch__icon--error {
+  color: var(--danger);
+  background: #fef2f2;
+}
+
+.orch__icon--skipped {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+@keyframes orch-icon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .orch__action {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
+  transition: background 120ms ease;
 }
 
 .orch__action--success {
@@ -526,6 +695,7 @@ button {
 
 .orch__action-icon {
   font-size: 14px;
+  font-weight: 700;
 }
 
 .orch__placeholder {
@@ -536,33 +706,20 @@ button {
   line-height: 1.5;
 }
 
-/* ---------- Scenario restart hint ---------- */
-
-.scenario-nav__item--active .scenario-nav__index {
-  opacity: 1;
-}
-
-.scenario-nav__item--active::after {
-  content: '↻';
-  margin-left: 4px;
-  font-size: 11px;
-  opacity: 0.6;
-}
-
-/* ---------- Chat loading ---------- */
-
-.chat__history-loading {
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 12px 0;
-  font-style: italic;
-}
-
-/* ---------- Recent conversations ---------- */
+/* ============================================
+   Recent conversations
+   ============================================ */
 
 .recent {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.recent__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
@@ -575,6 +732,23 @@ button {
   margin: 0;
 }
 
+.recent__refresh {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.recent__refresh:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
 .recent__hint {
   font-size: 12px;
   color: var(--text-muted);
@@ -583,6 +757,18 @@ button {
 
 .recent__hint--error {
   color: var(--danger);
+}
+
+.recent__retry {
+  margin-left: 6px;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  font-size: 12px;
+}
+
+.recent__retry:hover {
+  color: var(--accent-hover);
 }
 
 .recent__list {
@@ -635,7 +821,9 @@ button {
   color: var(--text-muted);
 }
 
-/* ---------- ProductView ---------- */
+/* ============================================
+   ProductView
+   ============================================ */
 
 .product {
   display: flex;
@@ -696,8 +884,6 @@ button {
   margin: 12px 0 0;
 }
 
-/* ---------- Architecture ---------- */
-
 .arch {
   list-style: none;
   padding: 0;
@@ -754,8 +940,6 @@ button {
   line-height: 1;
 }
 
-/* ---------- Metrics ---------- */
-
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -790,8 +974,6 @@ button {
   line-height: 1.4;
   margin-top: 2px;
 }
-
-/* ---------- KPI ---------- */
 
 .kpi {
   display: flex;
@@ -881,80 +1063,9 @@ button {
   font-weight: 700;
 }
 
-.app__footer {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* ---------- Header sidebar toggle ---------- */
-
-.header__left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.header__sidebar-toggle {
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  font-size: 18px;
-  color: var(--text-secondary);
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.header__sidebar-toggle:hover {
-  background: var(--bg-subtle);
-  color: var(--text-primary);
-}
-
-/* ---------- Sidebar ---------- */
-
-.sidebar {
-  overflow: hidden;
-  background: var(--bg-subtle);
-  border-right: 1px solid var(--border);
-  min-height: 0;
-  transition: opacity 150ms ease;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.sidebar--open {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.sidebar__inner {
-  width: 280px;
-  height: 100%;
-  overflow-y: auto;
-  padding: 16px 12px;
-  min-height: 0;
-}
-
-.recent__retry {
-  margin-left: 6px;
-  color: var(--accent);
-  font-weight: 500;
-  text-decoration: underline;
-  font-size: 12px;
-}
-
-.recent__retry:hover {
-  color: var(--accent-hover);
-}
-
-.orch__source {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-/* ---------- ConfirmationCard ---------- */
+/* ============================================
+   ConfirmationCard
+   ============================================ */
 
 .chat__confirmation {
   display: flex;
@@ -973,10 +1084,22 @@ button {
   box-shadow: var(--shadow-md);
   outline: none;
   transition: box-shadow 120ms ease;
+  animation: confirm-card-appear 240ms ease;
 }
 
 .confirm-card:focus-visible {
   box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.08), var(--shadow-md);
+}
+
+@keyframes confirm-card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .confirm-card__header {
@@ -1072,6 +1195,12 @@ button {
   color: var(--text-primary);
 }
 
+.confirm-card__btn--primary:focus-visible,
+.confirm-card__btn--ghost:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .confirm-card__progress {
   padding: 8px 16px 14px;
   display: flex;
@@ -1102,6 +1231,15 @@ button {
   justify-content: center;
   width: 14px;
   font-size: 12px;
+}
+
+.confirm-card__progress-step--active .confirm-card__progress-icon {
+  animation: confirm-card-pulse 1s infinite ease-in-out;
+}
+
+@keyframes confirm-card-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .confirm-card__success {
@@ -1156,323 +1294,9 @@ button {
   border-top: 1px solid var(--border);
 }
 
-/* ---------- DemoMode ---------- */
-
-.demo {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 0;
-}
-
-.demo__title {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 0 0 4px;
-}
-
-.demo__subtitle {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin: 0 0 16px;
-}
-
-.demo__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-@media (max-width: 720px) {
-  .demo__grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.demo__card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  text-align: left;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  transition: border-color 120ms ease, box-shadow 120ms ease,
-    transform 120ms ease;
-  cursor: pointer;
-}
-
-.demo__card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.demo__card-index {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-.demo__card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.demo__card-description {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.demo__card-prompt {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
-  font-size: 11px;
-  font-style: italic;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-.recent__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.recent__refresh {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 14px;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.recent__refresh:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
-
-.chat__history-loading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 12px 0;
-  font-style: italic;
-}
-
-.chat__history-label {
-  margin-left: 4px;
-}
-
-.chat__message-content--typing {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 14px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.chat__typing-label {
-  margin-left: 4px;
-  font-style: italic;
-  color: var(--text-muted);
-}
-
-/* ---------- ConfirmationCard animations ---------- */
-
-.confirm-card {
-  animation: confirm-card-appear 240ms ease;
-}
-
-@keyframes confirm-card-appear {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.confirm-card__btn--primary:focus-visible,
-.confirm-card__btn--ghost:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.confirm-card__progress-step--active .confirm-card__progress-icon {
-  animation: confirm-card-pulse 1s infinite ease-in-out;
-}
-
-@keyframes confirm-card-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-/* ---------- ConfirmationCard animations ---------- */
-
-.confirm-card {
-  animation: confirm-card-appear 240ms ease;
-}
-
-@keyframes confirm-card-appear {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.confirm-card__btn--primary:focus-visible,
-.confirm-card__btn--ghost:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.confirm-card__progress-step--active .confirm-card__progress-icon {
-  animation: confirm-card-pulse 1s infinite ease-in-out;
-}
-
-@keyframes confirm-card-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-/* ---------- Orchestration animations ---------- */
-
-.orch__section {
-  animation: orch-section-appear 320ms ease both;
-}
-
-@keyframes orch-section-appear {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.orch-panel__view {
-  animation: orch-panel-fade 200ms ease;
-}
-
-@keyframes orch-panel-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* ---------- Status icons polish ---------- */
-
-.orch__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-  transition: background 120ms ease;
-}
-
-.orch__icon--success {
-  color: var(--success);
-  background: #ecfdf5;
-}
-
-.orch__icon--warning {
-  color: var(--warning);
-  background: #fffbeb;
-}
-
-.orch__icon--progress {
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  animation: orch-icon-pulse 1.4s infinite ease-in-out;
-}
-
-.orch__icon--error {
-  color: var(--danger);
-  background: #fef2f2;
-}
-
-.orch__icon--skipped {
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-}
-
-@keyframes orch-icon-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-/* ---------- Action block polish ---------- */
-
-.orch__action {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 120ms ease;
-}
-
-.orch__action-icon {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .orch__section,
-  .orch-panel__view,
-  .confirm-card,
-  .orch__icon--progress,
-  .confirm-card__progress-step--active .confirm-card__progress-icon {
-    animation: none !important;
-  }
-}
-
-/* ---------- HandoffCard ---------- */
+/* ============================================
+   HandoffCard
+   ============================================ */
 
 .chat__handoff {
   display: flex;
@@ -1579,7 +1403,9 @@ button {
   outline-offset: 2px;
 }
 
-/* ---------- ClarificationCard ---------- */
+/* ============================================
+   ClarificationCard
+   ============================================ */
 
 .chat__clarification {
   display: flex;
@@ -1719,4 +1545,260 @@ button {
 .clarification-card__submit:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ============================================
+   DemoMode
+   ============================================ */
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+  min-width: 0;
+}
+
+.demo__title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+
+.demo__subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.demo__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.demo__card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color 120ms ease, box-shadow 120ms ease,
+    transform 120ms ease;
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.demo__card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.demo__card-index {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.demo__card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.demo__card-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.demo__card-prompt {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ============================================
+   Accessibility: prefers-reduced-motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .orch__section,
+  .orch-panel__view,
+  .confirm-card,
+  .handoff-card,
+  .clarification-card,
+  .orch__icon--progress,
+  .confirm-card__progress-step--active .confirm-card__progress-icon {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   MOBILE OVERRIDES — ПОСЛЕДНИЙ БЛОК В ФАЙЛЕ.
+   В CSS правило ниже выигрывает при равной специфичности.
+   Здесь используем !important для гарантии, потому что Vite
+   может менять порядок стилей через JS-чанки.
+   ============================================================ */
+
+@media (max-width: 900px) {
+  /* КРИТИЧНО: одна колонка, приоритет выше базового правила */
+    .app__body,
+  .app--sidebar-open .app__body {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  /* Высота с учётом динамической адресной строки */
+  .app {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Убираем правую панель из grid-потока */
+  .app__aside {
+    display: none !important;
+  }
+
+  /* Sidebar — drawer поверх контента */
+  .sidebar {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 50;
+    background: var(--bg-card);
+    box-shadow: 4px 0 16px rgba(15, 23, 42, 0.08);
+    transform: translateX(-100%);
+    transition: transform 220ms ease, opacity 220ms ease;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sidebar--open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar__inner {
+    width: 100%;
+    padding: 16px 12px;
+  }
+
+  /* Оверлей для закрытия drawer */
+  .app__overlay {
+    display: block;
+    position: fixed;
+    inset: 64px 0 0 0;
+    background: rgba(15, 23, 42, 0.35);
+    z-index: 40;
+    animation: overlay-fade 180ms ease;
+  }
+
+  @keyframes overlay-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Header — компактнее */
+  .header__subtitle,
+  .header__label {
+    display: none;
+  }
+
+  .header__customer {
+    font-size: 12px;
+  }
+
+  .header__sidebar-toggle {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+
+  /* Input form — компактнее */
+  .chat__input-form {
+    padding: 12px 16px 16px;
+    gap: 6px;
+  }
+
+  .chat__input {
+    padding: 10px 12px;
+    font-size: 13px;
+    min-width: 0;
+  }
+
+  .chat__send {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  .chat__messages {
+    padding: 16px 16px 8px;
+  }
+
+  /* Scenario nav — компактнее, без индексов */
+  .scenario-nav {
+    padding: 0 12px;
+  }
+
+  .scenario-nav__item {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .scenario-nav__index {
+    display: none;
+  }
+
+  /* ============================================================
+     КРИТИЧНО: разрешаем сжатие. Без min-width: 0 grid/flex элементы
+     не могут быть уже своего содержимого, и чат растягивается
+     за пределы viewport (507px вместо 430px).
+     ============================================================ */
+
+  .chat,
+  .chat__messages,
+  .chat__message,
+  .chat__message-content,
+  .chat__input-form,
+  .demo,
+  .demo__grid,
+  .demo__card,
+  .demo__card-title,
+  .demo__card-description,
+  .demo__card-prompt,
+  .confirm-card,
+  .handoff-card,
+  .clarification-card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Demo Mode — одна колонка */
+  .demo__grid {
+    grid-template-columns: 1fr !important;
+  }
 }
